@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Worker (auto, head-parallel)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+           background:#0b0b0f; color:#e9eef4; margin:0; padding:16px; }
+    h3 { margin-top:0; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    input { background:#12141a; color:#e9eef4; border:1px solid #232634;
+            padding:6px 10px; border-radius:6px; }
+    button { background:#2340ff; color:#fff; border:0; padding:8px 12px;
+             border-radius:6px; cursor:pointer; font-weight:600; }
+    .secondary { background:#444; }
+    #log { margin-top:14px; white-space:pre-wrap; font-family:monospace; }
+  </style>
+</head>
+<body>
+  <h3>Worker (auto, head-parallel)</h3>
+
+  <div class="row">
+    <label>Room</label>
+    <input id="room" type="text" value="default" />
+    <button id="join">Join Swarm</button>
+    <button id="refresh" class="secondary">Refresh Page</button>
+  </div>
+
+  <div id="log"></div>
+
+  <script type="module" src="./worker_auto_hp.js"></script>
+</body>
+</html>
