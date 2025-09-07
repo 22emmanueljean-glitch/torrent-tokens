@@ -1,0 +1,29 @@
+# fly.toml — tot-scheduler-signal
+
+app = "tot-scheduler-signal"
+primary_region = "cdg"   # Paris (match what you picked)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  # Health check so the release goes to "running"
+  [[http_service.checks]]
+    protocol = "http"
+    method = "GET"
+    path = "/coord_auto.html"
+    interval = "10s"
+    timeout = "2s"
+    grace_period = "5s"
+
+[vm]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb"

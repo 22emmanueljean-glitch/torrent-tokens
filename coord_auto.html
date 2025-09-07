@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Coordinator (auto-offer)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+           background:#0b0b0f; color:#e9eef4; margin:0; padding:16px; }
+    h3 { margin:0 0 8px 0; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; align-items:center; }
+    input { background:#12141a; color:#e9eef4; border:1px solid #232634; padding:6px 10px; border-radius:6px; }
+    button { background:#2340ff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:600; }
+    button.secondary { background:#3a3f55; }
+    #log { margin-top:12px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h3>Coordinator (auto-offer)</h3>
+  <div class="row">
+    <label>Room:</label>
+    <input id="room" type="text" value="default" />
+    <button id="start">Start Coordinator</button>
+    <button id="run" class="secondary">Run Test Prompt</button>
+    <button id="reoffer" class="secondary">Re-offer All</button>
+    <button id="reset" class="secondary">Reset Signaling</button>
+    <button id="clear" class="secondary">Clear Log</button>
+  </div>
+  <div id="log"></div>
+  <script type="module" src="./coord_auto.js"></script>
+</body>
+</html>

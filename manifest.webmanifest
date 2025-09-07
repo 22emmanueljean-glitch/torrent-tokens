@@ -1,0 +1,10 @@
+{
+    "name": "Torrent Tokens Worker",
+    "short_name": "ToT Worker",
+    "start_url": "/worker_auto.html",
+    "display": "standalone",
+    "background_color": "#0b0b0f",
+    "theme_color": "#0b0b0f",
+    "icons": []
+  }
+  

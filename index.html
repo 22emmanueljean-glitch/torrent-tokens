@@ -1,22 +1,92 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Torrent-Tokens</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8" />
+  <title>Torrent-Tokens — Launcher</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:#0f0f0f;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;}
-    h1{font-size:3rem;margin-bottom:0.5rem;background:linear-gradient(90deg,#00c6ff,#0072ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-    p{font-size:1.2rem;margin-bottom:2rem;opacity:.8;}
-    .btn{padding:1rem 2rem;border:none;border-radius:8px;font-size:1rem;background:linear-gradient(90deg,#00c6ff,#0072ff);color:#fff;cursor:pointer;transition:transform .2s;}
-    .btn:hover{transform:scale(1.05);}
-    footer{position:absolute;bottom:1rem;font-size:.8rem;opacity:.6;}
+    :root { color-scheme: dark; }
+    body { margin:0; font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d12; color:#e7eaf1; }
+    header { padding:24px; border-bottom:1px solid #1a1f2b; display:flex; align-items:center; gap:12px;}
+    header h1 { margin:0; font-size:20px; letter-spacing:.3px; }
+    main { padding:24px; max-width:900px; margin:0 auto; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap:16px; }
+    .card { background:#101522; border:1px solid #1a2234; border-radius:14px; padding:18px; }
+    h2 { margin:0 0 10px; font-size:18px; }
+    p { margin:0 0 12px; color:#aeb6c7; }
+    a.button { display:inline-block; text-decoration:none; background:#2d6cff; color:white; padding:10px 14px; border-radius:10px; font-weight:600; }
+    a.button.secondary { background:#1e2638; border:1px solid #2a3550; color:#e7eaf1; }
+    small { color:#8e97ab; }
+    ul { margin:8px 0 0 18px; color:#aeb6c7; }
+    code { background:#0e1422; border:1px solid #202a42; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 <body>
-  <h1>Torrent-Tokens™</h1>
-  <p>Free GPT-level AI powered by your phone swarm.</p>
-  <a class="btn" href="demo/network_demo.html">Launch Demo</a>
-  <footer>© 2024 Emmanuel Dessallien – Defensive Publication v1.0</footer>
+  <header>
+    <h1>⛓️‍💥 Torrent-Tokens – Launcher</h1>
+  </header>
+
+  <main>
+    <div class="grid">
+
+      <!-- Coordinator (auto, head-parallel) -->
+      <section class="card">
+        <h2>Coordinator – Head-Parallel (Auto)</h2>
+        <p>
+          Uses <code>coord_hp.js</code> with real weights by default, absolute asset URLs,
+          proper logits via <code>wte.bin</code>, and temp/top-p sampling.
+        </p>
+        <p>
+          <a class="button" href="./coord_hp.html">Open Coordinator</a>
+        </p>
+        <small>
+          Flow: Start Coordinator → Init Model → Load Shards (should say “with urls”) → Start Decode.
+        </small>
+      </section>
+
+      <!-- Worker (auto, head-parallel) -->
+      <section class="card">
+        <h2>Worker – Phone (Auto Head)</h2>
+        <p>
+          Uses your existing <code>worker_hp.js</code> (auto worker) that loads shards sent by the coordinator.
+          Open this on each phone.
+        </p>
+        <p>
+          <a class="button" href="./worker_hp.html">Open Worker (Phone)</a>
+        </p>
+        <small>
+          Tap “Join” on the phone after the Coordinator is running.
+        </small>
+      </section>
+
+      <!-- Legacy / manual pages kept for reference -->
+      <section class="card">
+        <h2>Legacy / Manual Pages</h2>
+        <p>Still here for reference while we migrate everything:</p>
+        <p style="display:flex; gap:8px; flex-wrap:wrap;">
+          <a class="button secondary" href="./coord_manual.html">Old Coordinator</a>
+          <a class="button secondary" href="./worker_auto.html">Old Worker (Auto)</a>
+          <a class="button secondary" href="./worker_manual.html">Old Worker (Manual)</a>
+        </p>
+        <small>These don’t wire into the new head-parallel flow. Prefer the two buttons above.</small>
+      </section>
+
+      <!-- Quick status & files -->
+      <section class="card">
+        <h2>Project Status</h2>
+        <ul>
+          <li>Signaling: Fly.io WSS live at <code>/</code></li>
+          <li>Tokenizer: <code>/assets/tokenizer/tokenizer.json</code></li>
+          <li>Weights manifest: <code>/assets/weights/manifest.json</code></li>
+          <li>Weight tensors: <code>qkv.bin</code>, <code>o.bin</code>, <code>ff1.bin</code>, <code>ff2.bin</code>, <code>wte.bin</code></li>
+        </ul>
+        <p style="margin-top:12px;">
+          If you see 404s for weights from phones, make sure those files are present in
+          <code>assets/weights/</code> and redeploy.
+        </p>
+      </section>
+
+    </div>
+  </main>
 </body>
 </html>

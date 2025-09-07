@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Worker (auto-signaling, LAN)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+           background:#0b0b0f; color:#e9eef4; margin:0; padding:16px; }
+    h3 { margin:0 0 8px 0; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; align-items:center; }
+    input { background:#12141a; color:#e9eef4; border:1px solid #232634; padding:6px 10px; border-radius:6px; }
+    button { background:#2340ff; color:#fff; border:0; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:600; }
+    button.secondary { background:#3a3f55; }
+    button.danger { background:#b33; }
+    #log { margin-top:12px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#1b1e2a; border:1px solid #2b3042; font-size:12px; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#666; box-shadow:0 0 0 2px rgba(255,255,255,.04) inset; }
+    .dot.ws { background:#2d6bff; }
+    .dot.rtc { background:#22c55e; }
+    .muted { opacity:.75; font-size:.9em; }
+  </style>
+</head>
+<body>
+  <h3>Worker (auto-signaling, LAN)</h3>
+
+  <div class="row">
+    <label>Room:</label>
+    <input id="room" type="text" value="default" />
+    <button id="join">Join Swarm</button>
+    <button id="reconnect" class="secondary">Reconnect</button>
+    <button id="newIdReconnect" class="secondary">Reconnect (new ID)</button>
+    <button id="refresh" class="secondary">Refresh Page</button>
+    <button id="hardReset" class="danger">Hard Reset</button>
+    <span class="pill">
+      <span id="wsDot" class="dot"></span><span>WS</span> ·
+      <span id="rtcDot" class="dot"></span><span>RTC</span>
+    </span>
+  </div>
+
+  <div class="muted">Open this on phone. Green dot = DataChannel open. If it sleeps, tap Reconnect or Refresh Page.</div>
+
+  <div id="log"></div>
+
+  <script type="module" src="./worker_auto.js"></script>
+</body>
+</html>

@@ -1,15 +1,29 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Torrent-Tokens Coordinator</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Coordinator</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px}
+    textarea{width:100%;height:180px}
+    button{padding:10px 14px;margin:6px 6px 6px 0}
+    #out{margin-top:10px;font-size:.9rem;line-height:1.3;white-space:pre-wrap}
+    .muted{opacity:.7}
+  </style>
 </head>
 <body>
   <h3>Coordinator (laptop)</h3>
-  <textarea id="offerIn" placeholder="paste worker offer here"></textarea>
-  <button id="connect">Connect Worker</button>
-  <button id="run">Run Test Prompt</button>
+  <div>
+    <button id="start">Start Coordinator</button>
+    <button id="copyOffer" disabled>Copy Offer</button>
+  </div>
+  <p class="muted">Paste the <strong>JOINER blob</strong> (answer JSON + any ICE) below, then click <strong>Apply</strong>:</p>
+  <textarea id="joinerBlob" placeholder="Paste phone's answer + ICE here"></textarea>
+  <div>
+    <button id="apply">Apply Joiner Blob</button>
+    <button id="run">Run Test Prompt</button>
+  </div>
   <pre id="out"></pre>
-  <script type="module" src="coord.js"></script>
+  <script type="module" src="coord.js?v=4"></script>
 </body>
 </html>

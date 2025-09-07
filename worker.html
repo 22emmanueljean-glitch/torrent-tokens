@@ -1,13 +1,22 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Torrent-Tokens Worker</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Worker</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:16px}
+    textarea{width:100%;height:180px}
+    button{padding:10px 14px;margin:6px 6px 6px 0}
+    #log{margin-top:10px;font-size:.9rem;line-height:1.3}
+  </style>
 </head>
 <body>
-  <h3>Worker node</h3>
+  <h3>Worker (phone)</h3>
   <button id="join">Join Swarm</button>
+  <p>Paste the <strong>HOST blob</strong> (offer JSON + any ICE) below, then click <strong>Apply</strong>:</p>
+  <textarea id="hostBlob" placeholder="Paste host offer + ICE here"></textarea>
+  <button id="apply">Apply Host Blob</button>
   <div id="log"></div>
-  <script type="module" src="worker.js"></script>
+  <script type="module" src="worker.js?v=4"></script>
 </body>
 </html>

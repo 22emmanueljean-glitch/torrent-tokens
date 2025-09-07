@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Worker – Head-Parallel (Phone)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; background:#0b0d12; color:#e7eaf1; font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    header { padding:16px 20px; border-bottom:1px solid #172036; }
+    main { padding:20px; max-width:800px; margin:0 auto; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    input, button { border-radius:10px; border:1px solid #1f2a46; background:#10182b; color:#e7eaf1; padding:8px 10px; }
+    button { background:#2d6cff; border:0; font-weight:600; cursor:pointer; }
+    button.secondary { background:#1b2340; border:1px solid #2a3558; }
+    #log { white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0f1526; border:1px solid #1a2442; padding:12px; border-radius:12px; min-height:200px; }
+  </style>
+</head>
+<body>
+  <header><h3>Worker – Head-Parallel (Phone)</h3></header>
+  <main>
+    <div class="row">
+      <label>Room</label>
+      <input id="room" type="text" value="default" />
+      <button id="join">Join</button>
+      <button id="reconnect" class="secondary">Reconnect</button>
+      <button id="newIdReconnect" class="secondary">Reconnect (new ID)</button>
+      <button id="hardReset" class="secondary">Hard Reset</button>
+    </div>
+
+    <div id="log"></div>
+  </main>
+
+  <!-- Load AFTER DOM so handlers can bind -->
+  <script type="module" src="./worker_hp.js"></script>
+</body>
+</html>
