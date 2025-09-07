@@ -1,102 +1,161 @@
-// Worker (auto) — sends hello, accepts offers, replies to ACTV_JSON
-const joinBtn = document.getElementById("join");
-const refreshBtn = document.getElementById("refresh");
-const roomInput = document.getElementById("room");
+// Worker (head-parallel) – diagnostics-first, no stale SW, verbose logs
+// This file *must* be the one your page loads. You should see "BOOT OK" below in the phone log.
+
 const logDiv = document.getElementById("log");
-const log = (s)=>{ logDiv.textContent += s + "\n"; };
+function log(s, cls="") {
+  const line = document.createElement("div");
+  if (cls) line.className = cls;
+  line.textContent = s;
+  logDiv.appendChild(line);
+  // keep last ~300 lines
+  if (logDiv.childElementCount > 300) logDiv.removeChild(logDiv.firstChild);
+}
 
+window.addEventListener("error", (e)=>log(`JS error: ${e.message}`, "err"));
+window.addEventListener("unhandledrejection", (e)=>log(`Promise rejection: ${e.reason}`, "err"));
+
+log("✅ BOOT OK: worker_auto_hp.js loaded", "ok");
+log(`Origin: ${location.origin}`);
+if (location.protocol !== "https:" && location.hostname !== "localhost") {
+  log("⚠️ Not HTTPS; WebRTC may be blocked on iOS. Use https://…/worker_auto_hp.html", "warn");
+}
+
+// UI
+const roomInput     = document.getElementById("room");
+const joinBtn       = document.getElementById("join");
+const reconnectBtn  = document.getElementById("reconnect");
+const hardResetBtn  = document.getElementById("hardReset");
+const nukeBtn       = document.getElementById("nuke");
+
+// State
 let ws=null, pc=null, chan=null;
-let peerId=null, roomId="default";
-let helloTimer=null;
+let roomId="default";
+let peerId=null;
+let wantWS=false;          // user wants signaling up
+let keepWS=true;           // stop reconnect spam after DC open
+let wsTimer=null;
 
-function wsURL(){
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}?room=${encodeURIComponent(roomId)}&peer=${encodeURIComponent(peerId||"")}&role=worker`;
-}
-function sendWS(o){ try{ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }catch{} }
-function startHello(){
-  stopHello();
-  helloTimer = setInterval(()=> sendWS({ type:"hello", role:"worker", peerId }), 3000);
-  sendWS({ type:"hello", role:"worker", peerId });
-}
-function stopHello(){ if(helloTimer){ clearInterval(helloTimer); helloTimer=null; } }
-function safeClose(x, fn="close"){ try{ x?.[fn]?.(); } catch{} }
+// --- helpers
+const safeClose = (x, fn="close") => { try { x?.[fn]?.(); } catch {} };
+const wsURL = () => `wss://${location.host}?room=${encodeURIComponent(roomId)}&peer=${encodeURIComponent(peerId)}&role=worker`;
 
-// simple deterministic hash reply so coord sees results
-function fnv32(bytes){
-  let h = 0x811c9dc5 >>> 0, p = 0x01000193;
-  for (let i=0;i<bytes.length;i++){ h ^= bytes[i]; h = Math.imul(h, p) >>> 0; }
-  const out = new Uint8Array(4);
-  new DataView(out.buffer).setUint32(0, h);
-  return out;
+function scheduleWSReconnect(ms=1500){
+  clearTimeout(wsTimer);
+  if (!wantWS || !keepWS) return;
+  wsTimer = setTimeout(connectWS, ms);
 }
-const hexOf = (u8)=> Array.from(u8).map(b=>b.toString(16).padStart(2,"0")).join("");
 
+async function nukeCaches() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) { try { await r.unregister(); } catch {} }
+    }
+    if (window.caches) {
+      const names = await caches.keys();
+      for (const n of names) { try { await caches.delete(n); } catch {} }
+    }
+    log("🧨 Cache nuked — reloading…", "warn");
+    setTimeout(()=>location.reload(), 200);
+  } catch (e) {
+    log("Cache nuke error: "+(e?.message||e), "err");
+  }
+}
+
+nukeBtn.onclick = nukeCaches;
+
+// --- signaling
 function connectWS(){
   safeClose(ws);
-  ws = new WebSocket(wsURL());
+  const url = wsURL();
+  log(`🔌 WS connect → ${url}`);
+  try {
+    ws = new WebSocket(url);
+  } catch (e) {
+    log("WS ctor error: " + (e?.message||e), "err");
+    scheduleWSReconnect(2500);
+    return;
+  }
+
   ws.onopen = () => {
-    log(`🔗 WS open ${wsURL()}`);
-    sendWS({ type:"join", role:"worker", roomId, peerId });
-    startHello();
+    log("🔗 WS open", "ok");
+    ws.send(JSON.stringify({ type:"join", role:"worker", roomId, peerId }));
+    // Send a pong-test every 10s so we see activity
+    try { ws.send(JSON.stringify({ type:"hello", role:"worker", peerId })); } catch {}
   };
+
   ws.onmessage = async (ev) => {
-    let msg; try{ msg = JSON.parse(ev.data); } catch { return; }
+    let msg=null;
+    try { msg = JSON.parse(ev.data); } catch {}
+    if (!msg) return;
+
     if (msg.type === "offer" && msg.to === peerId) {
-      stopHello();
+      log(`📨 Offer from ${msg.from}`);
       safeClose(pc);
-      pc = new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] });
+      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302"}] });
 
       pc.ondatachannel = (ev) => {
         chan = ev.channel;
         chan.binaryType = "arraybuffer";
-        chan.onopen  = () => log("🟢 DataChannel open");
-        chan.onclose = () => log("⚠️ DataChannel closed");
-        chan.onerror = (e) => log("❌ DataChannel error: " + (e?.message||e));
+        chan.onopen  = () => { log("🟢 DataChannel open", "ok"); keepWS = false; };
+        chan.onclose = () => { log("⚠️ DataChannel closed", "warn"); keepWS = true; scheduleWSReconnect(500); };
+        chan.onerror = (e) => log("DC error: " + (e?.message||e), "err");
+
+        // Minimal handlers so coordinator can sanity-check
         chan.onmessage = (e) => {
-          if (typeof e.data === "string") {
-            try {
-              const m = JSON.parse(e.data);
-              if (m.test === "ping") {
-                chan.send(JSON.stringify({ test:"pong", from: peerId }));
-              } else if (m.type === "ACTV_JSON") {
-                const act = new Uint8Array(m.actBlob||[]);
-                const res = fnv32(act);
-                chan.send(JSON.stringify({ stepId:m.stepId, tileId:m.tileId, result: hexOf(res) }));
-              } else if (m.type === "load_shard") {
-                // acknowledge shard load (synthetic or urls)
-                chan.send(JSON.stringify({ type:"shard_ready", heads: m.heads }));
-              }
-            } catch {}
-          }
+          try {
+            const m = typeof e.data === "string" ? JSON.parse(e.data) : null;
+            if (m?.test === "ping") {
+              chan?.send(JSON.stringify({ test: "pong", from: peerId }));
+              log("↩️ pong", "ok");
+            }
+          } catch {}
         };
       };
-      pc.onicecandidate = (e)=>{ if(e.candidate) sendWS({ type:"ice", to: msg.from, from: peerId, candidate: e.candidate }); };
-      pc.onconnectionstatechange = ()=>{
-        const st = pc.connectionState;
-        if (st === "disconnected" || st === "failed" || st === "closed") {
-          log(`⚠️ RTCPeer ${st} — waiting for new offer`);
-          startHello();
-        }
-      };
+
+      pc.onicecandidate = (e) => { if (e.candidate) ws?.send(JSON.stringify({ type:"ice", to: msg.from, from: peerId, candidate: e.candidate })); };
+      pc.onconnectionstatechange = () => log(`PC state: ${pc.connectionState}`);
+
       await pc.setRemoteDescription(msg.sdp);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      sendWS({ type:"answer", to: msg.from, from: peerId, sdp: answer });
-      log("Answer sent");
+      ws.send(JSON.stringify({ type:"answer", to: msg.from, from: peerId, sdp: answer }));
+      log("✅ Answer sent", "ok");
+      return;
     }
+
     if (msg.type === "ice" && msg.to === peerId && pc) {
-      try { await pc.addIceCandidate(msg.candidate); } catch {}
+      try { await pc.addIceCandidate(msg.candidate); } catch (e) { log("ICE add error: "+(e?.message||e), "err"); }
+      return;
     }
   };
-  ws.onclose = ()=>{ log("⚠️ WS closed (worker)"); stopHello(); };
-  ws.onerror = (e)=> log("❌ WS error: " + (e?.message||"see console"));
+
+  ws.onerror = (e) => log("WS error: " + (e?.message || "see console"), "err");
+  ws.onclose = () => { log("⚠️ WS closed", "warn"); scheduleWSReconnect(1500); };
 }
 
-joinBtn.onclick = ()=>{
+// --- buttons
+joinBtn.onclick = () => {
   roomId = roomInput.value || "default";
   if (!peerId) peerId = "w-" + Math.random().toString(36).slice(2);
+  wantWS = true;
+  keepWS = true;
   log(`Join requested: room="${roomId}" as ${peerId}`);
   connectWS();
 };
-refreshBtn.onclick = ()=> location.reload();
+
+reconnectBtn.onclick = () => {
+  wantWS = true;
+  keepWS = true;
+  log("🔄 Reconnect (same ID)");
+  safeClose(chan); safeClose(pc); safeClose(ws);
+  setTimeout(connectWS, 200);
+};
+
+hardResetBtn.onclick = () => {
+  wantWS = false;
+  keepWS = false;
+  log("🧹 Hard reset (stop auto-rejoin)");
+  peerId = null;
+  safeClose(chan); safeClose(pc); safeClose(ws);
+};
