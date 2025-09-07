@@ -2,12 +2,19 @@
   "modelId": "distilgpt2-layer0",
   "dtype": "f32",
   "layout": "row_major",
-  "dims": { "dModel": 768, "nHeads": 12, "dHead": 64,
-            "mlpHidden": 3072, "nLayers": 1, "vocab": 50257 },
+  "dims": {
+    "dModel": 768,
+    "nHeads": 12,
+    "dHead": 64,
+    "mlpHidden": 3072,
+    "nLayers": 1,
+    "vocab": 50257
+  },
   "tensors": {
     "qkv": "./assets/weights/qkv.bin",
     "o":   "./assets/weights/o.bin",
     "ff1": "./assets/weights/ff1.bin",
-    "ff2": "./assets/weights/ff2.bin"
+    "ff2": "./assets/weights/ff2.bin",
+    "wte": "./assets/weights/wte.bin"
   }
 }
