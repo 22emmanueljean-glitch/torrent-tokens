@@ -2,25 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Worker (head-parallel)</title>
+  <title>Worker (Head-Parallel)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <style>
     :root { color-scheme: dark; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
            background:#0b0b0f; color:#e9eef4; margin:0; padding:16px; }
     h3 { margin-top:0; }
     .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-    input, button {
-      padding:8px 10px; border-radius:8px; border:0;
-    }
+    input, button { padding:8px 10px; border-radius:8px; border:0; }
     input { background:#12141a; color:#e9eef4; border:1px solid #232634; }
     button { background:#2340ff; color:#fff; font-weight:600; cursor:pointer; }
     button.secondary { background:#444; }
     button.danger { background:#b33; }
-    #log { margin-top:14px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-    .ok { color:#64f; }
-    .warn { color:#fb3; }
-    .err { color:#f66; }
+    #log { margin-top:14px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .ok{color:#64f}.warn{color:#fb3}.err{color:#f66}
   </style>
 </head>
 <body>
@@ -37,10 +34,11 @@
 
   <div id="log"></div>
 
-  <!-- IMPORTANT: module load with a cache-buster -->
-  <script type="module" src="/worker_auto_hp.js?v=5"></script>
+  <!-- Load the worker script (no version query needed now) -->
+  <script type="module" src="/worker_auto_hp.js"></script>
+
+  <!-- Auto-unregister any old service worker at first paint -->
   <script>
-    // If any old Service Worker was registered by earlier builds, we *explicitly* unregister it on first paint.
     (async () => {
       try {
         if ('serviceWorker' in navigator) {

@@ -1,13 +1,11 @@
-// Worker (head-parallel) – diagnostics-first, no stale SW, verbose logs
-// This file *must* be the one your page loads. You should see "BOOT OK" below in the phone log.
+// Worker (head-parallel) – diagnostics + safe reconnects (no cache-busting query needed)
 
 const logDiv = document.getElementById("log");
 function log(s, cls="") {
-  const line = document.createElement("div");
-  if (cls) line.className = cls;
-  line.textContent = s;
-  logDiv.appendChild(line);
-  // keep last ~300 lines
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = s;
+  logDiv.appendChild(d);
   if (logDiv.childElementCount > 300) logDiv.removeChild(logDiv.firstChild);
 }
 
@@ -31,11 +29,11 @@ const nukeBtn       = document.getElementById("nuke");
 let ws=null, pc=null, chan=null;
 let roomId="default";
 let peerId=null;
-let wantWS=false;          // user wants signaling up
-let keepWS=true;           // stop reconnect spam after DC open
+let wantWS=false;
+let keepWS=true;
 let wsTimer=null;
 
-// --- helpers
+// helpers
 const safeClose = (x, fn="close") => { try { x?.[fn]?.(); } catch {} };
 const wsURL = () => `wss://${location.host}?room=${encodeURIComponent(roomId)}&peer=${encodeURIComponent(peerId)}&role=worker`;
 
@@ -61,32 +59,23 @@ async function nukeCaches() {
     log("Cache nuke error: "+(e?.message||e), "err");
   }
 }
-
 nukeBtn.onclick = nukeCaches;
 
-// --- signaling
+// signaling
 function connectWS(){
   safeClose(ws);
   const url = wsURL();
   log(`🔌 WS connect → ${url}`);
-  try {
-    ws = new WebSocket(url);
-  } catch (e) {
-    log("WS ctor error: " + (e?.message||e), "err");
-    scheduleWSReconnect(2500);
-    return;
-  }
+  try { ws = new WebSocket(url); } catch (e) { log("WS ctor error: " + (e?.message||e), "err"); scheduleWSReconnect(2500); return; }
 
   ws.onopen = () => {
     log("🔗 WS open", "ok");
     ws.send(JSON.stringify({ type:"join", role:"worker", roomId, peerId }));
-    // Send a pong-test every 10s so we see activity
     try { ws.send(JSON.stringify({ type:"hello", role:"worker", peerId })); } catch {}
   };
 
   ws.onmessage = async (ev) => {
-    let msg=null;
-    try { msg = JSON.parse(ev.data); } catch {}
+    let msg=null; try { msg = JSON.parse(ev.data); } catch {}
     if (!msg) return;
 
     if (msg.type === "offer" && msg.to === peerId) {
@@ -101,7 +90,6 @@ function connectWS(){
         chan.onclose = () => { log("⚠️ DataChannel closed", "warn"); keepWS = true; scheduleWSReconnect(500); };
         chan.onerror = (e) => log("DC error: " + (e?.message||e), "err");
 
-        // Minimal handlers so coordinator can sanity-check
         chan.onmessage = (e) => {
           try {
             const m = typeof e.data === "string" ? JSON.parse(e.data) : null;
@@ -126,7 +114,6 @@ function connectWS(){
 
     if (msg.type === "ice" && msg.to === peerId && pc) {
       try { await pc.addIceCandidate(msg.candidate); } catch (e) { log("ICE add error: "+(e?.message||e), "err"); }
-      return;
     }
   };
 
@@ -134,7 +121,7 @@ function connectWS(){
   ws.onclose = () => { log("⚠️ WS closed", "warn"); scheduleWSReconnect(1500); };
 }
 
-// --- buttons
+// buttons
 joinBtn.onclick = () => {
   roomId = roomInput.value || "default";
   if (!peerId) peerId = "w-" + Math.random().toString(36).slice(2);
@@ -143,18 +130,14 @@ joinBtn.onclick = () => {
   log(`Join requested: room="${roomId}" as ${peerId}`);
   connectWS();
 };
-
 reconnectBtn.onclick = () => {
-  wantWS = true;
-  keepWS = true;
+  wantWS = true; keepWS = true;
   log("🔄 Reconnect (same ID)");
   safeClose(chan); safeClose(pc); safeClose(ws);
   setTimeout(connectWS, 200);
 };
-
 hardResetBtn.onclick = () => {
-  wantWS = false;
-  keepWS = false;
+  wantWS = false; keepWS = false;
   log("🧹 Hard reset (stop auto-rejoin)");
   peerId = null;
   safeClose(chan); safeClose(pc); safeClose(ws);

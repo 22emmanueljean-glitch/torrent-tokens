@@ -1,4 +1,4 @@
-// HTTP static + WebSocket signaling with heartbeats + worker discovery
+// HTTP static + WebSocket signaling (no-cache for assets)
 const path = require("path");
 const http = require("http");
 const express = require("express");
@@ -8,14 +8,27 @@ const { URL } = require("url");
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// serve everything from repo root (adjust if you keep assets elsewhere)
+// ---- No-cache headers for frontend assets ----
+const NO_STORE_EXT = new Set([".html", ".js", ".css", ".wgsl", ".json", ".webmanifest"]);
+app.use((req, res, next) => {
+  const ext = path.extname(req.path).toLowerCase();
+  if (NO_STORE_EXT.has(ext)) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+  }
+  next();
+});
+
+// Static files (from repo root)
 app.use(express.static(path.join(__dirname)));
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
 
-// room -> Map(peerId -> ws)
-const rooms = new Map();
+// ---- WebSocket signaling (rooms + relay) ----
+const wss = new WebSocketServer({ server });
+const rooms = new Map(); // room -> Map(peerId -> ws)
 
 function getRoom(name) {
   if (!rooms.has(name)) rooms.set(name, new Map());
@@ -41,22 +54,12 @@ function routeTo(roomName, to, payload) {
   try { ws.send(JSON.stringify(payload)); } catch {}
   return true;
 }
-function broadcastToRole(roomName, role, payload) {
-  const room = rooms.get(roomName);
-  if (!room) return;
-  for (const [, sock] of room) {
-    if (sock.readyState !== sock.OPEN) continue;
-    if (sock._meta?.role === role) {
-      try { sock.send(JSON.stringify(payload)); } catch {}
-    }
-  }
-}
 
 wss.on("connection", (ws, req) => {
   const u = new URL(req.url, `http://${req.headers.host}`);
   const roomId = u.searchParams.get("room") || "default";
-  const role   = u.searchParams.get("role") || "worker";
-  let peerId   = u.searchParams.get("peer") || null;
+  const role = u.searchParams.get("role") || "worker";
+  let peerId = u.searchParams.get("peer") || null;
 
   ws.isAlive = true;
   ws._meta = { roomId, role, peerId };
@@ -67,43 +70,16 @@ wss.on("connection", (ws, req) => {
     let msg = null;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // Heartbeats
-    if (msg.type === "ka") return;
+    if (msg.type === "ka" || msg.type === "hello") return;
 
-    // JOIN: register peer and notify coordinators (discovery)
     if (msg.type === "join") {
-      if (!msg.peerId) msg.peerId = (role === "worker" ? "w-" : "coord-") + Math.random().toString(36).slice(2);
+      if (!msg.peerId) msg.peerId = "w-" + Math.random().toString(36).slice(2);
       peerId = msg.peerId;
       ws._meta.peerId = peerId;
       putPeer(roomId, peerId, ws);
-
-      // tell all coordinators in the room that someone joined
-      broadcastToRole(roomId, "coord", {
-        type: "hello",
-        role,
-        peerId,
-        roomId
-      });
       return;
     }
 
-    // HELLO: relay to coordinators so they can connect
-    if (msg.type === "hello") {
-      // ensure we know this socket's peerId (some workers send hello before join)
-      if (msg.peerId && !ws._meta.peerId) {
-        ws._meta.peerId = msg.peerId;
-        putPeer(roomId, msg.peerId, ws);
-      }
-      broadcastToRole(roomId, "coord", {
-        type: "hello",
-        role: msg.role || ws._meta.role || role,
-        peerId: msg.peerId || ws._meta.peerId,
-        roomId
-      });
-      return;
-    }
-
-    // Relay SDP / ICE between peers
     if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice") {
       if (!msg.to || !msg.from) return;
       msg.roomId = roomId;
@@ -112,21 +88,18 @@ wss.on("connection", (ws, req) => {
     }
   });
 
-  ws.on("close", () => {
-    delPeer(roomId, peerId, ws);
-  });
+  ws.on("close", () => delPeer(roomId, peerId, ws));
   ws.on("error", () => {});
 });
 
-// Heartbeat killer every 30s
+// heartbeat
 const interval = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) { try { ws.terminate(); } catch {} return; }
+    if (ws.isAlive === false) { try { ws.terminate(); } catch {}; return; }
     ws.isAlive = false;
     try { ws.ping(); } catch {}
   });
 }, 30000);
-
 wss.on("close", () => clearInterval(interval));
 
 server.listen(PORT, () => {
