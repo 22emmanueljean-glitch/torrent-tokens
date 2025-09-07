@@ -2,29 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Coordinator – Head-Parallel</title>
+  <title>Coordinator – Head-Parallel (DIAG)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root { color-scheme: dark; }
-    body { margin:0; background:#0b0d12; color:#e7eaf1; font:16px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin:0; background:#0b0d12; color:#e7eaf1; font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
     header { padding:16px 20px; border-bottom:1px solid #172036; }
     main { padding:20px; max-width:1000px; margin:0 auto; }
     .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
     input, button { border-radius:10px; border:1px solid #1f2a46; background:#10182b; color:#e7eaf1; padding:8px 10px; }
     button { background:#2d6cff; border:0; font-weight:600; cursor:pointer; }
     button.secondary { background:#1b2340; border:1px solid #2a3558; }
-    label { opacity:.8; }
     #log { white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0f1526; border:1px solid #1a2442; padding:12px; border-radius:12px; min-height:220px; }
-    .grid { display:grid; grid-template-columns: 1fr; gap:12px; }
-    .controls { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px; }
-    .kvs { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .num { width:100px; }
+    .num { width:110px; }
     .wide { min-width:260px; flex:1; }
   </style>
 </head>
 <body>
-  <header><h3>Coordinator – Head-Parallel</h3></header>
-  <main class="grid">
+  <header><h3>Coordinator – Head-Parallel (Diagnostic)</h3></header>
+  <main>
     <div class="row">
       <label>Room</label>
       <input id="roomInput" class="wide" type="text" value="default" />
@@ -36,9 +32,9 @@
       <button id="clearBtn" class="secondary">Clear Log</button>
     </div>
 
-    <div class="row kvs">
+    <div class="row">
       <label><input id="useReal" type="checkbox" /> Use real weights</label>
-      <label>Max tokens <input id="maxTokens" class="num" type="number" value="64" min="1" max="2048" /></label>
+      <label>Max tokens <input id="maxTokens" class="num" type="number" value="64" /></label>
       <label>Temp <input id="temp" class="num" type="number" step="0.05" value="0.8" /></label>
       <label>Top-p <input id="topp" class="num" type="number" step="0.05" value="0.9" /></label>
       <label>Timeout ms <input id="timeoutMs" class="num" type="number" value="1200" /></label>
@@ -51,7 +47,7 @@
     <div id="log"></div>
   </main>
 
-  <!-- Load AFTER DOM so handlers can bind -->
+  <!-- IMPORTANT: module path must be correct; this must 200 OK on Fly -->
   <script type="module" src="./coord_hp.js"></script>
 </body>
 </html>
