@@ -1,4 +1,4 @@
-// HTTP static + WebSocket signaling (no-cache for assets)
+// HTTP static + WebSocket signaling with heartbeats + "joined" broadcast
 const path = require("path");
 const http = require("http");
 const express = require("express");
@@ -8,57 +8,59 @@ const { URL } = require("url");
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// ---- No-cache headers for frontend assets ----
-const NO_STORE_EXT = new Set([".html", ".js", ".css", ".wgsl", ".json", ".webmanifest"]);
-app.use((req, res, next) => {
-  const ext = path.extname(req.path).toLowerCase();
-  if (NO_STORE_EXT.has(ext)) {
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
-    res.setHeader("Surrogate-Control", "no-store");
-  }
-  next();
-});
-
-// Static files (from repo root)
+// serve the repo dir (index.html, worker_auto_hp.html, assets, etc.)
 app.use(express.static(path.join(__dirname)));
 
 const server = http.createServer(app);
-
-// ---- WebSocket signaling (rooms + relay) ----
 const wss = new WebSocketServer({ server });
-const rooms = new Map(); // room -> Map(peerId -> ws)
+
+// roomName -> Map(peerId -> { ws, role })
+const rooms = new Map();
 
 function getRoom(name) {
   if (!rooms.has(name)) rooms.set(name, new Map());
   return rooms.get(name);
 }
-function putPeer(roomName, peerId, ws) {
+
+function putPeer(roomName, peerId, role, ws) {
   const room = getRoom(roomName);
-  const old = room.get(peerId);
-  if (old && old !== ws) { try { old.terminate(); } catch {} }
-  room.set(peerId, ws);
+  const prev = room.get(peerId);
+  if (prev && prev.ws !== ws) {
+    try { prev.ws.terminate(); } catch {}
+  }
+  room.set(peerId, { ws, role });
 }
+
 function delPeer(roomName, peerId, ws) {
   const room = rooms.get(roomName);
   if (!room) return;
   const cur = room.get(peerId);
-  if (cur === ws) room.delete(peerId);
+  if (cur && cur.ws === ws) room.delete(peerId);
 }
-function routeTo(roomName, to, payload) {
+
+function broadcastToCoords(roomName, payloadObj) {
+  const room = rooms.get(roomName);
+  if (!room) return;
+  for (const [_, entry] of room) {
+    if (entry.role === "coord" && entry.ws.readyState === entry.ws.OPEN) {
+      try { entry.ws.send(JSON.stringify(payloadObj)); } catch {}
+    }
+  }
+}
+
+function routeTo(roomName, toPeerId, payloadObj) {
   const room = rooms.get(roomName);
   if (!room) return false;
-  const ws = room.get(to);
-  if (!ws || ws.readyState !== ws.OPEN) return false;
-  try { ws.send(JSON.stringify(payload)); } catch {}
+  const entry = room.get(toPeerId);
+  if (!entry || entry.ws.readyState !== entry.ws.OPEN) return false;
+  try { entry.ws.send(JSON.stringify(payloadObj)); } catch {}
   return true;
 }
 
 wss.on("connection", (ws, req) => {
   const u = new URL(req.url, `http://${req.headers.host}`);
   const roomId = u.searchParams.get("room") || "default";
-  const role = u.searchParams.get("role") || "worker";
+  let role = u.searchParams.get("role") || "worker";
   let peerId = u.searchParams.get("peer") || null;
 
   ws.isAlive = true;
@@ -70,16 +72,28 @@ wss.on("connection", (ws, req) => {
     let msg = null;
     try { msg = JSON.parse(raw); } catch { return; }
 
+    // keep-alives
     if (msg.type === "ka" || msg.type === "hello") return;
 
     if (msg.type === "join") {
-      if (!msg.peerId) msg.peerId = "w-" + Math.random().toString(36).slice(2);
-      peerId = msg.peerId;
+      // allow client to omit peerId; we’ll assign
+      peerId = msg.peerId || (role === "coord" ? ("coord-" + Math.random().toString(36).slice(2))
+                                                : ("w-" + Math.random().toString(36).slice(2)));
+      role = msg.role || role;
       ws._meta.peerId = peerId;
-      putPeer(roomId, peerId, ws);
+      ws._meta.role = role;
+      putPeer(roomId, peerId, role, ws);
+
+      // tell all coordinators someone joined
+      broadcastToCoords(roomId, { type: "joined", roomId, peerId, role });
+
+      // optional: ack to the joiner
+      try { ws.send(JSON.stringify({ type: "joined_ack", roomId, peerId, role })); } catch {}
+
       return;
     }
 
+    // relay SDP/ICE
     if (msg.type === "offer" || msg.type === "answer" || msg.type === "ice") {
       if (!msg.to || !msg.from) return;
       msg.roomId = roomId;
@@ -88,20 +102,29 @@ wss.on("connection", (ws, req) => {
     }
   });
 
-  ws.on("close", () => delPeer(roomId, peerId, ws));
+  ws.on("close", () => {
+    delPeer(roomId, peerId, ws);
+    // inform coordinators a peer left (optional but useful)
+    if (peerId) broadcastToCoords(roomId, { type: "left", roomId, peerId, role });
+  });
+
   ws.on("error", () => {});
 });
 
-// heartbeat
+// heartbeat pings
 const interval = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) { try { ws.terminate(); } catch {}; return; }
+    if (ws.isAlive === false) {
+      try { ws.terminate(); } catch {}
+      return;
+    }
     ws.isAlive = false;
     try { ws.ping(); } catch {}
   });
 }, 30000);
+
 wss.on("close", () => clearInterval(interval));
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`HTTP+WS listening on http://localhost:${PORT}`);
 });

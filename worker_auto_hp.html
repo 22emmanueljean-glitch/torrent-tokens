@@ -4,49 +4,45 @@
   <meta charset="utf-8" />
   <title>Worker (Head-Parallel)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
   <style>
     :root { color-scheme: dark; }
-    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
            background:#0b0b0f; color:#e9eef4; margin:0; padding:16px; }
-    h3 { margin-top:0; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-    input, button { padding:8px 10px; border-radius:8px; border:0; }
-    input { background:#12141a; color:#e9eef4; border:1px solid #232634; }
-    button { background:#2340ff; color:#fff; font-weight:600; cursor:pointer; }
-    button.secondary { background:#444; }
-    button.danger { background:#b33; }
-    #log { margin-top:14px; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .ok{color:#64f}.warn{color:#fb3}.err{color:#f66}
+    h3 { margin:0 0 12px 0; }
+    .row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; }
+    input { background:#12141a; color:#e9eef4; border:1px solid #232634; border-radius:8px; padding:8px 10px; }
+    button { background:#2450ff; color:white; border:0; border-radius:8px; padding:8px 12px; cursor:pointer; font-weight:600; }
+    button.secondary { background:#3b3f4c; }
+    .pill { background:#141827; border:1px solid #26304a; padding:8px 12px; border-radius:999px; display:inline-block; }
+    #log { white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top:12px; }
   </style>
 </head>
 <body>
   <h3>Worker (Head-Parallel)</h3>
 
   <div class="row">
-    <label>Room:</label>
-    <input id="room" type="text" value="default" />
+    <div class="pill">Origin: <b id="origin"></b></div>
+    <div class="pill">Room: <input id="room" value="default" style="width:120px"></div>
+  </div>
+
+  <div class="row">
     <button id="join">Join Swarm</button>
     <button id="reconnect" class="secondary">Reconnect</button>
-    <button id="hardReset" class="danger">Hard Reset</button>
-    <button id="nuke" class="secondary" title="Unregister service workers + clear caches">Nuke Cache</button>
+    <button id="hardReset" class="secondary">Hard Reset</button>
+    <button id="nuke" class="secondary">Nuke Cache</button>
   </div>
 
   <div id="log"></div>
 
-  <!-- Load the worker script (no version query needed now) -->
-  <script type="module" src="/worker_auto_hp.js"></script>
-
-  <!-- Auto-unregister any old service worker at first paint -->
-  <script>
-    (async () => {
-      try {
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of regs) { try { await r.unregister(); } catch {} }
-        }
-      } catch {}
-    })();
+  <script type="module">
+    import { antiCacheEnsureLatest, bootBanner, addLog } from './wire_v2.js';
+    await antiCacheEnsureLatest();
+    bootBanner('worker_auto_hp.js');
+    document.getElementById('origin').textContent = location.origin;
   </script>
+  <script type="module" src="./worker_auto_hp.js"></script>
 </body>
 </html>

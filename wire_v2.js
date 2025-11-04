@@ -1,27 +1,48 @@
-// MIT – Torrent-Tokens wire v2 (head-parallel)
+export const PROTO = 2;
+export const BUILD = "2025-09-09-v14";
+
 export const MSG = {
-    INIT_MODEL: "init_model",
-    LOAD_SHARD: "load_shard",
-    SHARD_READY: "shard_ready",
-    DECODE_STEP: "decode_step",
-    PARTIAL_OUT: "partial_out",
-    TELEMETRY: "telemetry",
-    ERROR: "error"
-  };
-  
-  export const is = (m, t) => m && m.type === t;
-  
-  export function encINIT(cfg) {
-    return JSON.stringify({ type: MSG.INIT_MODEL, ...cfg });
-  }
-  
-  // heads: [start,end) ; urls: { qkv, o, ff1, ff2 } – array or single url per tensor
-  export function encLOAD({ layer, heads, urls=null }) {
-    return JSON.stringify({ type: MSG.LOAD_SHARD, layer, heads, urls });
-  }
-  
-  // stepId, tokenId, pos (0-based)
-  export function encDECODE({ stepId, tokenId, pos }) {
-    return JSON.stringify({ type: MSG.DECODE_STEP, stepId, tokenId, pos });
-  }
-  
+  HELLO: "hello",
+  INIT_MODEL: "init_model",
+  LOAD_SHARD: "load_shard",
+  SHARD_READY: "shard_ready",
+  DECODE_STEP: "decode_step",
+  STATE_OUT: "state_out",
+  NEXT_TOKEN: "next_token",
+  PARTIAL_OUT: "partial_out",
+  TELEMETRY: "telemetry",
+  PING: "ping",
+  PONG: "pong"
+};
+
+export function addLog(line) {
+  const el = document.getElementById("log");
+  if (el) el.innerHTML += line + "<br>";
+  try { console.log(line.replaceAll("<br>","\n")); } catch {}
+}
+
+export function bootBanner(who) {
+  addLog(`✅ BOOT OK: ${who} [PROTO=${PROTO} | BUILD=${BUILD}]`);
+  window.__WIRE_V2_MARKER__ = { PROTO, BUILD };
+}
+
+export async function antiCacheEnsureLatest() {
+  try {
+    const seen = sessionStorage.getItem("__build_seen__");
+    if (seen && seen === BUILD) return;
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) { try { await r.unregister(); } catch {} }
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    sessionStorage.setItem("__build_seen__", BUILD);
+  } catch {}
+}
+
+export function wsURL(roomId, peerId, role) {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${location.host}?room=${encodeURIComponent(roomId)}&peer=${encodeURIComponent(peerId)}&role=${encodeURIComponent(role)}`;
+}

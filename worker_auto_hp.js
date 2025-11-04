@@ -1,144 +1,159 @@
-// Worker (head-parallel) – diagnostics + safe reconnects (no cache-busting query needed)
+import { PROTO, BUILD, MSG, addLog, wsURL } from "./wire_v2.js";
 
-const logDiv = document.getElementById("log");
-function log(s, cls="") {
-  const d = document.createElement("div");
-  if (cls) d.className = cls;
-  d.textContent = s;
-  logDiv.appendChild(d);
-  if (logDiv.childElementCount > 300) logDiv.removeChild(logDiv.firstChild);
-}
+const roomInput = document.getElementById("room");
+const joinBtn = document.getElementById("join");
+const reconnectBtn = document.getElementById("reconnect");
+const hardResetBtn = document.getElementById("hardReset");
+const nukeBtn = document.getElementById("nuke");
 
-window.addEventListener("error", (e)=>log(`JS error: ${e.message}`, "err"));
-window.addEventListener("unhandledrejection", (e)=>log(`Promise rejection: ${e.reason}`, "err"));
-
-log("✅ BOOT OK: worker_auto_hp.js loaded", "ok");
-log(`Origin: ${location.origin}`);
-if (location.protocol !== "https:" && location.hostname !== "localhost") {
-  log("⚠️ Not HTTPS; WebRTC may be blocked on iOS. Use https://…/worker_auto_hp.html", "warn");
-}
-
-// UI
-const roomInput     = document.getElementById("room");
-const joinBtn       = document.getElementById("join");
-const reconnectBtn  = document.getElementById("reconnect");
-const hardResetBtn  = document.getElementById("hardReset");
-const nukeBtn       = document.getElementById("nuke");
-
-// State
 let ws=null, pc=null, chan=null;
-let roomId="default";
-let peerId=null;
-let wantWS=false;
-let keepWS=true;
-let wsTimer=null;
+let roomId="default", peerId=null;
 
-// helpers
-const safeClose = (x, fn="close") => { try { x?.[fn]?.(); } catch {} };
-const wsURL = () => `wss://${location.host}?room=${encodeURIComponent(roomId)}&peer=${encodeURIComponent(peerId)}&role=worker`;
+function log(s){ addLog(s); }
 
-function scheduleWSReconnect(ms=1500){
-  clearTimeout(wsTimer);
-  if (!wantWS || !keepWS) return;
-  wsTimer = setTimeout(connectWS, ms);
-}
+let dims=null;
+let W={};
+let kv=null;
 
-async function nukeCaches() {
-  try {
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const r of regs) { try { await r.unregister(); } catch {} }
-    }
-    if (window.caches) {
-      const names = await caches.keys();
-      for (const n of names) { try { await caches.delete(n); } catch {} }
-    }
-    log("🧨 Cache nuked — reloading…", "warn");
-    setTimeout(()=>location.reload(), 200);
-  } catch (e) {
-    log("Cache nuke error: "+(e?.message||e), "err");
+async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
+function zeros(n){ return new Float32Array(n); }
+function ones(n){ const a=new Float32Array(n); a.fill(1); return a; }
+function gelu(x){ const c=Math.sqrt(2/Math.PI); return 0.5*x*(1+Math.tanh(c*(x+0.044715*x*x*x))); }
+function layernorm_inplace(x,g,b){ const d=g.length; let mu=0; for(let i=0;i<d;i++) mu+=x[i]; mu/=d; let vs=0; for(let i=0;i<d;i++){ const t=x[i]-mu; vs+=t*t; } const inv=1/Math.sqrt(vs/d+1e-5); for(let i=0;i<d;i++) x[i]=(x[i]-mu)*inv*g[i]+b[i]; }
+function gemv_right_rowmajor(x,M,rows,cols,out){ for(let c=0;c<cols;c++){ let acc=0; for(let r=0;r<rows;r++) acc+=x[r]*M[r*cols+c]; out[c]=acc; } }
+function add_inplace(y,b){ for(let i=0;i<y.length;i++) y[i]+=b[i]; }
+function add_residual_inplace(y,x){ for(let i=0;i<y.length;i++) y[i]+=x[i]; }
+function split_qkv(v,d){ return { q:v.subarray(0,d), k:v.subarray(d,2*d), v:v.subarray(2*d,3*d) }; }
+
+function ensureKV(){ if(kv) return; const H=dims.nHeads,L=dims.maxSeq; kv={K:new Array(H),V:new Array(H),len:0}; for(let h=0;h<H;h++){ kv.K[h]=new Array(L); kv.V[h]=new Array(L); } }
+function kv_append(kh,vh){ const t=kv.len; for(let h=0;h<dims.nHeads;h++){ kv.K[h][t]=kh[h]; kv.V[h][t]=vh[h]; } kv.len++; }
+function self_attn(q,kf,vf,H,dh,T){ const scale=1/Math.sqrt(dh); const ctx=new Float32Array(H*dh); for(let h=0;h<H;h++){ const qh=q.subarray(h*dh,(h+1)*dh); const scores=new Float32Array(T); for(let t=0;t<T;t++){ let dot=0; const Kt=kf[h][t]; for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; scores[t]=dot*scale; } let m=-1e30; for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; let s=0; for(let i=0;i<scores.length;i++){ scores[i]=Math.exp(scores[i]-m); s+=scores[i]; } s=s||1; const out=ctx.subarray(h*dh,(h+1)*dh); out.fill(0); for(let t=0;t<T;t++){ const wt=scores[t]/s; const Vt=vf[h][t]; for(let j=0;j<dh;j++) out[j]+=wt*Vt[j]; } } return ctx; }
+
+function forward_from_embed(x){
+  const D=dims.dModel,H=dims.nHeads,dh=dims.dHead;
+  const x1=x.slice();
+  layernorm_inplace(x1,W.ln1_g,W.ln1_b);
+  const qkv=new Float32Array(3*D);
+  gemv_right_rowmajor(x1,W.qkv,D,3*D,qkv);
+  add_inplace(qkv,W.qkv_b);
+  const s=split_qkv(qkv,D);
+  const qH=new Array(H),kH=new Array(H),vH=new Array(H);
+  for(let h=0;h<H;h++){
+    qH[h]=s.q.subarray(h*dh,(h+1)*dh);
+    kH[h]=s.k.subarray(h*dh,(h+1)*dh);
+    vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
+  ensureKV();
+  kv_append(kH,vH);
+  const ctx=self_attn(s.q,kv.K,kv.V,H,dh,kv.len);
+  const aOut=new Float32Array(D);
+  gemv_right_rowmajor(ctx,W.o,D,D,aOut);
+  add_inplace(aOut,W.o_b);
+  add_residual_inplace(aOut,x);
+  const x2=aOut.slice();
+  layernorm_inplace(x2,W.ln2_g,W.ln2_b);
+  const ff=new Float32Array(dims.mlpHidden);
+  gemv_right_rowmajor(x2,W.ff1,D,dims.mlpHidden,ff);
+  add_inplace(ff,W.ff1_b);
+  for(let i=0;i<ff.length;i++) ff[i]=gelu(ff[i]);
+  const mOut=new Float32Array(D);
+  gemv_right_rowmajor(ff,W.ff2,dims.mlpHidden,D,mOut);
+  add_inplace(mOut,W.ff2_b);
+  add_residual_inplace(mOut,aOut);
+  return mOut;
 }
-nukeBtn.onclick = nukeCaches;
 
-// signaling
+function fillMissing(){ const D=dims.dModel,M=dims.mlpHidden; if(!W.ln1_g) W.ln1_g=ones(D); if(!W.ln1_b) W.ln1_b=zeros(D); if(!W.qkv_b) W.qkv_b=zeros(3*D); if(!W.o_b) W.o_b=zeros(D); if(!W.ln2_g) W.ln2_g=ones(D); if(!W.ln2_b) W.ln2_b=zeros(D); if(!W.ff1_b) W.ff1_b=zeros(M); if(!W.ff2_b) W.ff2_b=zeros(D); }
+
 function connectWS(){
-  safeClose(ws);
-  const url = wsURL();
-  log(`🔌 WS connect → ${url}`);
-  try { ws = new WebSocket(url); } catch (e) { log("WS ctor error: " + (e?.message||e), "err"); scheduleWSReconnect(2500); return; }
-
-  ws.onopen = () => {
-    log("🔗 WS open", "ok");
-    ws.send(JSON.stringify({ type:"join", role:"worker", roomId, peerId }));
-    try { ws.send(JSON.stringify({ type:"hello", role:"worker", peerId })); } catch {}
-  };
-
+  try{ ws?.close(); }catch{}
+  const url = wsURL(roomId, peerId, "worker");
+  log("🔌 WS connect → " + url);
+  ws = new WebSocket(url);
+  ws.onopen = () => { log("🔗 WS open"); ws.send(JSON.stringify({ type:"join", role:"worker", roomId, peerId })); ws.send(JSON.stringify({ type:MSG.HELLO, role:"worker", proto:PROTO, build:BUILD })); };
   ws.onmessage = async (ev) => {
-    let msg=null; try { msg = JSON.parse(ev.data); } catch {}
-    if (!msg) return;
-
-    if (msg.type === "offer" && msg.to === peerId) {
-      log(`📨 Offer from ${msg.from}`);
-      safeClose(pc);
-      pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302"}] });
-
-      pc.ondatachannel = (ev) => {
-        chan = ev.channel;
-        chan.binaryType = "arraybuffer";
-        chan.onopen  = () => { log("🟢 DataChannel open", "ok"); keepWS = false; };
-        chan.onclose = () => { log("⚠️ DataChannel closed", "warn"); keepWS = true; scheduleWSReconnect(500); };
-        chan.onerror = (e) => log("DC error: " + (e?.message||e), "err");
-
-        chan.onmessage = (e) => {
-          try {
-            const m = typeof e.data === "string" ? JSON.parse(e.data) : null;
-            if (m?.test === "ping") {
-              chan?.send(JSON.stringify({ test: "pong", from: peerId }));
-              log("↩️ pong", "ok");
-            }
-          } catch {}
-        };
-      };
-
-      pc.onicecandidate = (e) => { if (e.candidate) ws?.send(JSON.stringify({ type:"ice", to: msg.from, from: peerId, candidate: e.candidate })); };
-      pc.onconnectionstatechange = () => log(`PC state: ${pc.connectionState}`);
-
-      await pc.setRemoteDescription(msg.sdp);
+    let m; try{ m=JSON.parse(ev.data); }catch{ return; }
+    if (m.type==="offer" && m.to===peerId){
+      try{ pc?.close(); }catch{}
+      pc = new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] });
+      pc.ondatachannel = (e) => { chan=e.channel; chan.onopen=()=>log("✅ DC open"); chan.onmessage=onChanMessage; chan.onclose=()=>log("⚠️ DC closed"); chan.onerror=(e)=>log("❌ DC error: "+(e?.message||e)); };
+      pc.onicecandidate = (e)=>{ if(e.candidate) ws?.send(JSON.stringify({type:"ice",to:m.from,from:peerId,candidate:e.candidate})); };
+      pc.onconnectionstatechange = () => { const s=pc.connectionState; if(s==="disconnected"||s==="failed"||s==="closed") log("⚠️ RTCPeerConnection "+s); };
+      await pc.setRemoteDescription(m.sdp);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      ws.send(JSON.stringify({ type:"answer", to: msg.from, from: peerId, sdp: answer }));
-      log("✅ Answer sent", "ok");
+      ws?.send(JSON.stringify({ type:"answer", to:m.from, from:peerId, sdp:answer }));
+      log("Answer sent");
+      return;
+    }
+    if (m.type==="ice" && m.to===peerId && pc){ try{ await pc.addIceCandidate(m.candidate); }catch{} return; }
+  };
+  ws.onclose = () => log("⚠️ WS closed (worker)");
+  ws.onerror = (e) => log("❌ WS error (worker): " + (e?.message||""));
+}
+
+joinBtn.onclick = async () => {
+  try{ if("wakeLock" in navigator){ const wl=await navigator.wakeLock.request("screen"); wl.addEventListener("release",()=>log("🔓 Wake Lock released")); log("🔒 Wake Lock acquired"); } }catch{}
+  roomId = (roomInput.value || "default").trim();
+  if(!peerId) peerId = "w-" + Math.random().toString(36).slice(2);
+  log('Join requested: room="'+roomId+'" as '+peerId);
+  connectWS();
+};
+reconnectBtn.onclick = () => { log("↻ Reconnect requested"); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} setTimeout(connectWS,200); };
+hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
+nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
+
+async function onChanMessage(e){
+  if(typeof e.data !== "string") return;
+  let msg; try{ msg=JSON.parse(e.data); }catch{ return; }
+
+  if (msg.type===MSG.PING){ chan?.send(JSON.stringify({type:MSG.PONG})); return; }
+
+  if (msg.type===MSG.INIT_MODEL){
+    kv=null;
+    return;
+  }
+
+  if (msg.type===MSG.LOAD_SHARD){
+    dims = msg.dims || { dModel:768,nHeads:12,dHead:64,mlpHidden:3072,nLayers:1,vocab:50257,maxSeq:1024 };
+    const T = msg.weights || {};
+    const req = k => (T && typeof T[k]==="string") ? T[k] : null;
+
+    W.qkv = await fetchMaybe(req("qkv"));
+    W.o   = await fetchMaybe(req("o"));
+    W.ff1 = await fetchMaybe(req("ff1"));
+    W.ff2 = await fetchMaybe(req("ff2"));
+
+    W.ln1_g = await fetchMaybe(req("ln1_g"));
+    W.ln1_b = await fetchMaybe(req("ln1_b"));
+    W.qkv_b = await fetchMaybe(req("qkv_b"));
+    W.o_b   = await fetchMaybe(req("o_b"));
+    W.ln2_g = await fetchMaybe(req("ln2_g"));
+    W.ln2_b = await fetchMaybe(req("ln2_b"));
+    W.ff1_b = await fetchMaybe(req("ff1_b"));
+    W.ff2_b = await fetchMaybe(req("ff2_b"));
+
+    fillMissing();
+
+    const have = { qkv: !!W.qkv, o: !!W.o, ff1: !!W.ff1, ff2: !!W.ff2 };
+    chan?.send(JSON.stringify({ type: MSG.TELEMETRY, note: "weights", have, dims }));
+
+    if(!have.qkv || !have.o || !have.ff1 || !have.ff2){
+      chan?.send(JSON.stringify({ type: MSG.TELEMETRY, note: "missing required tensors" }));
       return;
     }
 
-    if (msg.type === "ice" && msg.to === peerId && pc) {
-      try { await pc.addIceCandidate(msg.candidate); } catch (e) { log("ICE add error: "+(e?.message||e), "err"); }
-    }
-  };
+    chan?.send(JSON.stringify({ type: MSG.SHARD_READY, heads: msg.heads || [0,0] }));
+    return;
+  }
 
-  ws.onerror = (e) => log("WS error: " + (e?.message || "see console"), "err");
-  ws.onclose = () => { log("⚠️ WS closed", "warn"); scheduleWSReconnect(1500); };
+  if (msg.type===MSG.DECODE_STEP){
+    if(!dims || !W.qkv || !W.o || !W.ff1 || !W.ff2) return;
+    const emb = Array.isArray(msg.embed) ? new Float32Array(msg.embed) : null;
+    if(!emb) return;
+    if(kv==null) ensureKV();
+    const h = forward_from_embed(emb);
+    chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
+    return;
+  }
 }
-
-// buttons
-joinBtn.onclick = () => {
-  roomId = roomInput.value || "default";
-  if (!peerId) peerId = "w-" + Math.random().toString(36).slice(2);
-  wantWS = true;
-  keepWS = true;
-  log(`Join requested: room="${roomId}" as ${peerId}`);
-  connectWS();
-};
-reconnectBtn.onclick = () => {
-  wantWS = true; keepWS = true;
-  log("🔄 Reconnect (same ID)");
-  safeClose(chan); safeClose(pc); safeClose(ws);
-  setTimeout(connectWS, 200);
-};
-hardResetBtn.onclick = () => {
-  wantWS = false; keepWS = false;
-  log("🧹 Hard reset (stop auto-rejoin)");
-  peerId = null;
-  safeClose(chan); safeClose(pc); safeClose(ws);
-};

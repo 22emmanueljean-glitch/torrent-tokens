@@ -8,13 +8,32 @@
     "dHead": 64,
     "mlpHidden": 3072,
     "nLayers": 1,
-    "vocab": 50257
+    "vocab": 50257,
+    "maxSeq": 1024
   },
   "tensors": {
-    "qkv": "./assets/weights/qkv.bin",
-    "o": "./assets/weights/o.bin",
-    "ff1": "./assets/weights/ff1.bin",
-    "ff2": "./assets/weights/ff2.bin",
-    "wte": "./assets/weights/wte.bin"
+    "wte": "./assets/weights/wte.bin",     
+    "wpe": "./assets/weights/wpe.bin",        
+
+    "ln1_g": "./assets/weights/ln1_g.bin",     
+    "ln1_b": "./assets/weights/ln1_b.bin",    
+
+    "qkv": "./assets/weights/qkv.bin",        
+    "qkv_b": "./assets/weights/qkv_b.bin",     
+
+    "o": "./assets/weights/o.bin",             
+    "o_b": "./assets/weights/o_b.bin",         
+
+    "ln2_g": "./assets/weights/ln2_g.bin",     
+    "ln2_b": "./assets/weights/ln2_b.bin",     
+
+    "ff1": "./assets/weights/ff1.bin",         
+    "ff1_b": "./assets/weights/ff1_b.bin",     
+    "ff2": "./assets/weights/ff2.bin",         
+    "ff2_b": "./assets/weights/ff2_b.bin"      
+  },
+  "tokenizer": {
+    "vocab": "./assets/tokenizer/vocab.json",
+    "merges": "./assets/tokenizer/merges.txt"
   }
 }

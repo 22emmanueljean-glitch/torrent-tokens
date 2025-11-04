@@ -1,53 +1,49 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Coordinator – Head-Parallel (DIAG)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>Coordinator – Head-Parallel (Diagnostic)</title>
   <style>
-    :root { color-scheme: dark; }
-    body { margin:0; background:#0b0d12; color:#e7eaf1; font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    header { padding:16px 20px; border-bottom:1px solid #172036; }
-    main { padding:20px; max-width:1000px; margin:0 auto; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
-    input, button { border-radius:10px; border:1px solid #1f2a46; background:#10182b; color:#e7eaf1; padding:8px 10px; }
-    button { background:#2d6cff; border:0; font-weight:600; cursor:pointer; }
-    button.secondary { background:#1b2340; border:1px solid #2a3558; }
-    #log { white-space:pre-wrap; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background:#0f1526; border:1px solid #1a2442; padding:12px; border-radius:12px; min-height:220px; }
-    .num { width:110px; }
-    .wide { min-width:260px; flex:1; }
+    body { font-family: monospace; background:#111; color:#0f0; }
+    button { margin:4px; padding:6px 10px; }
+    #log { white-space: pre-wrap; margin-top:10px; background:#000; padding:10px; }
+    #out { white-space: pre-wrap; margin-top:10px; background:#000; padding:10px; min-height:80px; color:#fff; }
+    label, input, textarea { color:#0f0; background:#000; border:1px solid #0a0; }
   </style>
 </head>
 <body>
-  <header><h3>Coordinator – Head-Parallel (Diagnostic)</h3></header>
-  <main>
-    <div class="row">
-      <label>Room</label>
-      <input id="roomInput" class="wide" type="text" value="default" />
-      <button id="startBtn">Start Coordinator</button>
-      <button id="initBtn" class="secondary">Init Model</button>
-      <button id="loadBtn" class="secondary">Load Shards</button>
-      <button id="startDecodeBtn">Start Decode</button>
-      <button id="stopDecodeBtn" class="secondary">Stop Decode</button>
-      <button id="clearBtn" class="secondary">Clear Log</button>
-    </div>
-
-    <div class="row">
-      <label><input id="useReal" type="checkbox" /> Use real weights</label>
-      <label>Max tokens <input id="maxTokens" class="num" type="number" value="64" /></label>
-      <label>Temp <input id="temp" class="num" type="number" step="0.05" value="0.8" /></label>
-      <label>Top-p <input id="topp" class="num" type="number" step="0.05" value="0.9" /></label>
-      <label>Timeout ms <input id="timeoutMs" class="num" type="number" value="1200" /></label>
-    </div>
-
-    <div class="row">
-      <input id="promptInput" class="wide" type="text" placeholder="Ask anything… (this primes the KV cache)" />
-    </div>
-
-    <div id="log"></div>
-  </main>
-
-  <!-- IMPORTANT: module path must be correct; this must 200 OK on Fly -->
+  <h2>Coordinator – Head-Parallel (Diagnostic)</h2>
+  <div>Origin: <span id="origin"></span></div>
+  <div>Room: <input id="room" value="default" size="12"></div>
+  <button id="btnStart">Start Coordinator</button>
+  <button id="btnInit">Init Model</button>
+  <button id="btnLoad">Load Shards</button>
+  <button id="btnDecode">Start Decode</button>
+  <button id="btnStop">Stop Decode</button>
+  <button id="btnClear">Clear Log</button>
+  <button id="btnWTE">Check WTE</button>
+  <label><input type="checkbox" id="useReal" checked> Use real weights</label>
+  <div>
+    <p>Max tokens <input id="maxtok" type="number" value="64"></p>
+    <p>Temp <input id="temp" type="number" value="1.0" step="0.1"></p>
+    <p>Top-p <input id="topp" type="number" value="0.9" step="0.05"></p>
+    <p>Timeout ms <input id="timeout" type="number" value="1200"></p>
+  </div>
+  <div>
+    Prompt<br>
+    <textarea id="prompt" rows="3" cols="60">HOW DO I MAKE $28 MILLION?</textarea>
+  </div>
+  <div>
+    <h3>Output</h3>
+    <pre id="out"></pre>
+  </div>
+  <pre id="log"></pre>
+  <script type="module">
+    import { antiCacheEnsureLatest, bootBanner } from './wire_v2.js';
+    await antiCacheEnsureLatest();
+    bootBanner('coord_hp.html');
+    document.getElementById('origin').textContent = location.origin;
+  </script>
   <script type="module" src="./coord_hp.js"></script>
 </body>
 </html>
