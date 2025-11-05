@@ -114,7 +114,7 @@ $("btnStart")?.addEventListener("click", async ()=>{
     log("✅ Tokenizer loaded");
     dims = Object.assign(dims, man.dims || {});
     const expected = 50257 * 768;
-    const wteUrl = "./assets/weights/wte.bin";
+    const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
     WTE = await fetchF32(wteUrl);
     wteReady = !!WTE && WTE.length === expected;
     if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready on coordinator"); }
