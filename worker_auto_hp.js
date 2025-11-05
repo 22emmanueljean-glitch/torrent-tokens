@@ -75,7 +75,14 @@ function connectWS(){
     let m; try{ m=JSON.parse(ev.data); }catch{ return; }
     if (m.type==="offer" && m.to===peerId){
       try{ pc?.close(); }catch{}
-      pc = new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] });
+      pc = new RTCPeerConnection({ 
+        iceServers:[
+          {urls:"stun:stun.l.google.com:19302"},
+          {urls:"stun:stun1.l.google.com:19302"},
+          {urls:"stun:stun2.l.google.com:19302"},
+          {urls:"stun:stun.cloudflare.com:3478"}
+        ] 
+      });
       pc.ondatachannel = (e) => { chan=e.channel; chan.onopen=()=>log("✅ DC open"); chan.onmessage=onChanMessage; chan.onclose=()=>log("⚠️ DC closed"); chan.onerror=(e)=>log("❌ DC error: "+(e?.message||e)); };
       pc.onicecandidate = (e)=>{ if(e.candidate) ws?.send(JSON.stringify({type:"ice",to:m.from,from:peerId,candidate:e.candidate})); };
       pc.onconnectionstatechange = () => { const s=pc.connectionState; if(s==="disconnected"||s==="failed"||s==="closed") log("⚠️ RTCPeerConnection "+s); };

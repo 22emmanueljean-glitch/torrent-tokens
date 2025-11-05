@@ -123,7 +123,14 @@ function cleanupPeer(peerId){ const p=peers.get(peerId); if(!p) return; try{ p.d
 
 async function createOffer(peerId){
   if(peers.has(peerId)) cleanupPeer(peerId);
-  const pc=new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] });
+  const pc=new RTCPeerConnection({ 
+    iceServers:[
+      {urls:"stun:stun.l.google.com:19302"},
+      {urls:"stun:stun1.l.google.com:19302"},
+      {urls:"stun:stun2.l.google.com:19302"},
+      {urls:"stun:stun.cloudflare.com:3478"}
+    ] 
+  });
   const dc=pc.createDataChannel("hp",{ordered:true});
   const state={ pc, dc, ready:false };
   peers.set(peerId,state);
