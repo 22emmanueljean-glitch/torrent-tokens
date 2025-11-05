@@ -18,6 +18,7 @@ let roomId = $("room")?.value || "default";
 let coordId = `coord-${Math.random().toString(36).slice(2)}`;
 const peers = new Map();
 let ws=null;
+let wsHeartbeat=null;
 
 let running=false, step=0, pos=0, maxTokens=64;
 let temp=1.0, topP=0.9;
@@ -75,7 +76,15 @@ function top_p_sample(p, top) {
   return kept[kept.length - 1][1];
 }
 
-async function fetchF32(url){ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) throw new Error("fetch "+url+" "+r.status); const b=await r.arrayBuffer(); return new Float32Array(b); }
+async function fetchF32(url){ 
+  log(`⬇️ Downloading ${url.split('/').pop()}...`);
+  const r=await fetch(url,{cache:"no-store"}); 
+  if(!r.ok) throw new Error("fetch "+url+" "+r.status); 
+  const b=await r.arrayBuffer(); 
+  log(`✅ Downloaded ${url.split('/').pop()} (${(b.byteLength/1024/1024).toFixed(1)}MB)`);
+  return new Float32Array(b); 
+}
+
 function sincos_wpe(L,D){ const pe=new Float32Array(L*D); for(let p=0;p<L;p++){ for(let i=0;i<D;i++){ const div=Math.pow(10000,(2*Math.floor(i/2))/D); const v=p/div; pe[p*D+i]=(i%2===0)?Math.sin(v):Math.cos(v); } } return pe; }
 function wte_row(out, id){ const D=dims.dModel; const base=id*D; for(let j=0;j<D;j++) out[j]=WTE[base+j]; }
 function embed_for_token(id, position){ const D=dims.dModel; const x=new Float32Array(D); wte_row(x,id); if(WPE){ const base=position*D; for(let j=0;j<D;j++) x[j]+=WPE[base+j]; } else { const pe=sincos_wpe(dims.maxSeq,D); const base=position*D; for(let j=0;j<D;j++) x[j]+=pe[base+j]; } return x; }
@@ -83,10 +92,22 @@ function logits_from_hidden(h){ const V=dims.vocab,D=dims.dModel; const logits=n
 
 function startWS(){
   try{ ws?.close(); }catch{}
+  if(wsHeartbeat) { clearInterval(wsHeartbeat); wsHeartbeat=null; }
+  
   ws = new WebSocket(wsURL());
-  ws.onopen   = ()=>{ log(`✅ Signaling connected (${wsURL()})`); safeSendWS({ type:"join", role:"coord", roomId, peerId:coordId }); };
-  ws.onclose  = ()=>log("⚠️ WS closed (coord)");
-  ws.onerror  = (e)=>log(`❌ WS error (coord): ${e?.message||""}`);
+  ws.onopen   = ()=>{ 
+    log(`✅ Signaling connected (${wsURL()})`); 
+    safeSendWS({ type:"join", role:"coord", roomId, peerId:coordId }); 
+    
+    // HEARTBEAT: Keep connection alive every 10 seconds
+    wsHeartbeat = setInterval(() => {
+      if (ws?.readyState === 1) {
+        safeSendWS({ type:"ping" });
+      }
+    }, 10000);
+  };
+  ws.onclose  = ()=>{ log("⚠️ WS closed (coord)"); if(wsHeartbeat) clearInterval(wsHeartbeat); };
+  ws.onerror  = (e)=>{ log(`❌ WS error (coord): ${e?.message||""}`); if(wsHeartbeat) clearInterval(wsHeartbeat); };
   ws.onmessage = onSignalMessage;
 }
 
@@ -151,7 +172,8 @@ $("btnStart")?.addEventListener("click", async ()=>{
     log("✅ Tokenizer loaded");
     dims = Object.assign(dims, man.dims || {});
     const expected = 50257 * 768;
-    const wteUrl = "./assets/weights/wte.bin";
+    const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
+    log("⏳ Loading WTE (147MB, may take 1-2 minutes)...");
     WTE = await fetchF32(wteUrl);
     wteReady = !!WTE && WTE.length === expected;
     if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready on coordinator"); }
@@ -167,6 +189,7 @@ $("btnInit")?.addEventListener("click", async ()=>{
   log(`Prompt tokens: ${promptTokens.length}`);
   for (const [_, p] of peers.entries()){ if(p.ready){ p.dc.send(JSON.stringify({ type:MSG.INIT_MODEL, proto:PROTO, build:BUILD })); } }
 });
+
 $("btnLoad")?.addEventListener("click", async ()=>{
   log("✅ CLICK: Load Shards");
   const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
@@ -185,17 +208,18 @@ $("btnLoad")?.addEventListener("click", async ()=>{
     start=end;
   }
 });
+
 $("btnDecode")?.addEventListener("click", ()=>{
   log("✅ CLICK: Start Decode");
   maxTokens = parseInt($("maxtok")?.value||"64",10)||64;
   temp = parseFloat($("temp")?.value||"1.0")||1.0;
   topP = parseFloat($("topp")?.value||"0.9")||0.9;
   if(!wteReady){ log("⚠️ WTE not ready; wait for '✅ WTE ready on coordinator'"); return; }
-  // FIXED: Remove double spread operator
   if([...peers.values()].filter(p=>p.ready).length===0){ log("⚠️ No workers connected"); return; }
   running=true; step=0; pos=0; assembledText=""; renderOut(assembledText);
   sendStep();
 });
+
 $("btnStop")?.addEventListener("click", ()=>{ log("✅ CLICK: Stop Decode"); running=false; });
 $("btnClear")?.addEventListener("click", ()=>{ if(logBox) logBox.textContent=""; assembledText=""; renderOut(assembledText); log("🧹 Logs & output cleared"); });
 
