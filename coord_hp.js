@@ -35,8 +35,45 @@ function wsURL(){
 }
 function safeSendWS(obj){ try{ ws?.readyState===1 && ws.send(JSON.stringify(obj)); }catch{} }
 
-function softmax_inplace(a){ let m=-1e30; for(let i=0;i<a.length;i++) if(a[i]>m) m=a[i]; let s=0; for(let i=0;i<a.length;i++){ a[i]=Math.exp((a[i]-m)/temp); s+=a[i]; } s=s||1; for(let i=0;i<a.length;i++) a[i]/=s; }
-function top_p_sample(p,top){ const idx=p.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]); let cum=0,cut=idx.length; for(let i=0;i<idx.length;i++){ cum+=idx[i][0]; if(cum>=top){ cut=i+1; break; } } const kept=idx.slice(0,cut); let s=0; for(const [v] of kept) s+=v; let r=Math.random()*s; for(const [v,i] of kept){ if(r<=v) return i; r-=v; } return kept[kept.length-1][1]; }
+function softmax_inplace(a) {
+  let m = -1e30;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] > m) m = a[i];
+  }
+  let s = 0;
+  for (let i = 0; i < a.length; i++) {
+    a[i] = Math.exp((a[i] - m) / temp);
+    s += a[i];
+  }
+  s = s || 1;
+  for (let i = 0; i < a.length; i++) {
+    a[i] /= s;
+  }
+}
+
+function top_p_sample(p, top) {
+  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  let cum = 0;
+  let cut = idx.length;
+  for (let i = 0; i < idx.length; i++) {
+    cum += idx[i][0];
+    if (cum >= top) {
+      cut = i + 1;
+      break;
+    }
+  }
+  const kept = idx.slice(0, cut);
+  let s = 0;
+  for (const item of kept) {
+    s += item[0];
+  }
+  let r = Math.random() * s;
+  for (const item of kept) {
+    if (r <= item[0]) return item[1];
+    r -= item[0];
+  }
+  return kept[kept.length - 1][1];
+}
 
 async function fetchF32(url){ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) throw new Error("fetch "+url+" "+r.status); const b=await r.arrayBuffer(); return new Float32Array(b); }
 function sincos_wpe(L,D){ const pe=new Float32Array(L*D); for(let p=0;p<L;p++){ for(let i=0;i<D;i++){ const div=Math.pow(10000,(2*Math.floor(i/2))/D); const v=p/div; pe[p*D+i]=(i%2===0)?Math.sin(v):Math.cos(v); } } return pe; }
@@ -114,7 +151,7 @@ $("btnStart")?.addEventListener("click", async ()=>{
     log("✅ Tokenizer loaded");
     dims = Object.assign(dims, man.dims || {});
     const expected = 50257 * 768;
-    const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
+    const wteUrl = "./assets/weights/wte.bin";
     WTE = await fetchF32(wteUrl);
     wteReady = !!WTE && WTE.length === expected;
     if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready on coordinator"); }
@@ -154,6 +191,7 @@ $("btnDecode")?.addEventListener("click", ()=>{
   temp = parseFloat($("temp")?.value||"1.0")||1.0;
   topP = parseFloat($("topp")?.value||"0.9")||0.9;
   if(!wteReady){ log("⚠️ WTE not ready; wait for '✅ WTE ready on coordinator'"); return; }
+  // FIXED: Remove double spread operator
   if([...peers.values()].filter(p=>p.ready).length===0){ log("⚠️ No workers connected"); return; }
   running=true; step=0; pos=0; assembledText=""; renderOut(assembledText);
   sendStep();
