@@ -135,9 +135,13 @@ async function onChanMessage(e){
   if (msg.type===MSG.LOAD_SHARD){
     dims = msg.dims || { dModel:768,nHeads:12,dHead:64,mlpHidden:3072,nLayers:1,vocab:50257,maxSeq:1024 };
     const T = msg.weights || {};
+    log("📥 LOAD_SHARD received");
+    log("🔍 Weight URLs: qkv=" + (T.qkv || "MISSING") + " o=" + (T.o || "MISSING"));
     const req = k => (T && typeof T[k]==="string") ? T[k] : null;
 
+    log("⬇️ Downloading qkv...");
     W.qkv = await fetchMaybe(req("qkv"));
+    log("✅ qkv result: " + (W.qkv ? W.qkv.length + " floats" : "FAILED"));
     W.o   = await fetchMaybe(req("o"));
     W.ff1 = await fetchMaybe(req("ff1"));
     W.ff2 = await fetchMaybe(req("ff2"));
