@@ -157,14 +157,16 @@ async function onChanMessage(e){
 
     fillMissing();
 
+    log("✅ All weights downloaded, verifying...");
     const have = { qkv: !!W.qkv, o: !!W.o, ff1: !!W.ff1, ff2: !!W.ff2 };
-    chan?.send(JSON.stringify({ type: MSG.TELEMETRY, note: "weights", have, dims }));
-
+    log("🔍 Final check: qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
+    
     if(!have.qkv || !have.o || !have.ff1 || !have.ff2){
-      chan?.send(JSON.stringify({ type: MSG.TELEMETRY, note: "missing required tensors" }));
+      log("❌ Missing required tensors!");
       return;
     }
-
+    
+    log("✅ All required weights loaded, sending SHARD_READY");
     chan?.send(JSON.stringify({ type: MSG.SHARD_READY, heads: msg.heads || [0,0] }));
     return;
   }
