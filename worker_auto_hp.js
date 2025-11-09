@@ -171,7 +171,9 @@ async function onChanMessage(e){
     if(!emb) return;
     if(kv==null) ensureKV();
     const h = forward_from_embed(emb);
+    log("✅ Computed hidden state, sending STATE_OUT...");
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
+    log("✅ STATE_OUT sent for step " + msg.stepId);
     return;
   }
 }

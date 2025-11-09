@@ -78,7 +78,7 @@ function top_p_sample(p, top) {
 
 async function fetchF32(url){ 
   log(`⬇️ Downloading ${url.split('/').pop()}...`);
-  const r=await fetch(url,{cache:"no-store"}); 
+  const r=await fetch(url,{cache:"force-cache"});
   if(!r.ok) throw new Error("fetch "+url+" "+r.status); 
   const b=await r.arrayBuffer(); 
   log(`✅ Downloaded ${url.split('/').pop()} (${(b.byteLength/1024/1024).toFixed(1)}MB)`);
