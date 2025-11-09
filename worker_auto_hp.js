@@ -166,8 +166,19 @@ async function onChanMessage(e){
   }
 
   if (msg.type===MSG.DECODE_STEP){
-    if(!dims || !W.qkv || !W.o || !W.ff1 || !W.ff2) return;
+    log("🔍 DECODE_STEP received for step " + msg.stepId);
+    log("🔍 Weight status: dims=" + !!dims + " qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
+    if(!dims || !W.qkv || !W.o || !W.ff1 || !W.ff2) {
+      log("❌ BLOCKED: Missing weights! dims=" + !!dims + " qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
+      return;
+    }
+    log("✅ All weights present, checking embed...");
     const emb = Array.isArray(msg.embed) ? new Float32Array(msg.embed) : null;
+    if(!emb) {
+      log("❌ BLOCKED: No embed in message!");
+      return;
+    }
+    log("✅ Embed received (" + emb.length + " floats), computing...");
     if(!emb) return;
     if(kv==null) ensureKV();
     const h = forward_from_embed(emb);
