@@ -111,8 +111,19 @@ hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; try{ chan?.c
 nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
 
 async function onChanMessage(e){
-  if(typeof e.data !== "string") return;
-  let msg; try{ msg=JSON.parse(e.data); }catch{ return; }
+  log("📨 Raw message received, type: " + typeof e.data);
+  if(typeof e.data !== "string") {
+    log("⚠️ Non-string message ignored");
+    return;
+  }
+  let msg; 
+  try{ 
+    msg=JSON.parse(e.data); 
+    log("📩 Parsed message type: " + (msg?.type || "unknown"));
+  }catch(err){ 
+    log("❌ JSON parse failed: " + err.message);
+    return; 
+  }
 
   if (msg.type===MSG.PING){ chan?.send(JSON.stringify({type:MSG.PONG})); return; }
 
