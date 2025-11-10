@@ -155,9 +155,13 @@ function onPeerMessage(peerId){
     if(msg.type===MSG.STATE_OUT){
       if(!wteReady){ log("⚠️ STATE_OUT received but WTE not ready"); return; }
       const hidden=new Float32Array(msg.hidden);
-      const logits=logits_from_hidden(hidden);
-      softmax_inplace(logits);
-      const nextId=top_p_sample(logits, topP);
+log("🧮 Hidden state length: " + hidden.length);
+const logits=logits_from_hidden(hidden);
+log("🎲 Logits length: " + logits.length + " first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
+softmax_inplace(logits);
+log("✨ After softmax first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
+const nextId=top_p_sample(logits, topP);
+log("🎯 Sampled token ID: " + nextId);
       const piece=tokenizer?tokenizer.decode([nextId]):"";
 log("🔤 Token " + step + ": id=" + nextId + " text='" + piece + "'");
 assembledText+=piece;
