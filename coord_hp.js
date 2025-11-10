@@ -1,7 +1,7 @@
 import { MSG } from "./wire_v2.js";
 import { loadGPT2Tokenizer } from "./tokenizer_gpt2.js";
 
-const BUILD = "2025-09-09-prod-11";
+const BUILD = "2025-09-09-v14";
 const PROTO = 2;
 
 const $ = (id) => document.getElementById(id);
