@@ -53,11 +53,17 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
-  // If all probabilities are basically zero, just return the argmax
-  const maxVal = Math.max(...p);
-  if (maxVal < 1e-10) {
-    return p.indexOf(Math.max(...p));
+  // Find max manually (Math.max(...p) fails on large arrays)
+  let maxIdx = 0;
+  let maxVal = p[0];
+  for (let i = 1; i < p.length; i++) {
+    if (p[i] > maxVal) {
+      maxVal = p[i];
+      maxIdx = i;
+    }
   }
+  return maxIdx;
+}
   
   const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
   let cum = 0;
