@@ -64,31 +64,6 @@ function top_p_sample(p, top) {
   }
   return maxIdx;
 }
-  
-  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
-  let cum = 0;
-  let cut = idx.length;
-  for (let i = 0; i < idx.length; i++) {
-    cum += idx[i][0];
-    if (cum >= top) {
-      cut = i + 1;
-      break;
-    }
-  }
-  const kept = idx.slice(0, cut);
-  let s = 0;
-  for (const item of kept) {
-    s += item[0];
-  }
-  if (s === 0) return kept[0][1]; // Fallback to argmax
-  
-  let r = Math.random() * s;
-  for (const item of kept) {
-    if (r <= item[0]) return item[1];
-    r -= item[0];
-  }
-  return kept[kept.length - 1][1];
-}
 
 async function fetchF32(url){ 
   log(`⬇️ Downloading ${url.split('/').pop()}...`);
