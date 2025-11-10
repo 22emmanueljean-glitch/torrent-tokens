@@ -159,8 +159,10 @@ function onPeerMessage(peerId){
       softmax_inplace(logits);
       const nextId=top_p_sample(logits, topP);
       const piece=tokenizer?tokenizer.decode([nextId]):"";
-      assembledText+=piece;
-      renderOut(assembledText);
+log("🔤 Token " + step + ": id=" + nextId + " text='" + piece + "'");
+assembledText+=piece;
+log("📝 Assembled so far: '" + assembledText + "'");
+renderOut(assembledText);
       lastToken=nextId; step++; pos++; sendStep();
       return;
     }
