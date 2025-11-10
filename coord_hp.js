@@ -150,6 +150,7 @@ function onPeerMessage(peerId){
   return (ev)=>{
     if(typeof ev.data!=="string") return;
     let msg; try{ msg=JSON.parse(ev.data); }catch{ return; }
+    log("📩 Coord received: " + msg.type);
     if(msg.type===MSG.SHARD_READY){ log(`✅ shard_ready from ${peerId} heads=${msg.heads[0]}-${msg.heads[1]}`); return; }
     if(msg.type===MSG.STATE_OUT){
       if(!wteReady){ log("⚠️ STATE_OUT received but WTE not ready"); return; }
