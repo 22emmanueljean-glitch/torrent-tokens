@@ -53,6 +53,12 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
+  // If all probabilities are basically zero, just return the argmax
+  const maxVal = Math.max(...p);
+  if (maxVal < 1e-10) {
+    return p.indexOf(Math.max(...p));
+  }
+  
   const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
   let cum = 0;
   let cut = idx.length;
@@ -68,6 +74,8 @@ function top_p_sample(p, top) {
   for (const item of kept) {
     s += item[0];
   }
+  if (s === 0) return kept[0][1]; // Fallback to argmax
+  
   let r = Math.random() * s;
   for (const item of kept) {
     if (r <= item[0]) return item[1];
