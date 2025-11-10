@@ -36,14 +36,14 @@ function wsURL(){
 }
 function safeSendWS(obj){ try{ ws?.readyState===1 && ws.send(JSON.stringify(obj)); }catch{} }
 
-function softmax_inplace(a) {
+function softmax_inplace(a, temperature) {
   let m = -1e30;
   for (let i = 0; i < a.length; i++) {
     if (a[i] > m) m = a[i];
   }
   let s = 0;
   for (let i = 0; i < a.length; i++) {
-    a[i] = Math.exp((a[i] - m) / temp);
+    a[i] = Math.exp((a[i] - m) / temperature);
     s += a[i];
   }
   s = s || 1;
@@ -158,7 +158,7 @@ function onPeerMessage(peerId){
 log("🧮 Hidden state length: " + hidden.length);
 const logits=logits_from_hidden(hidden);
 log("🎲 Logits length: " + logits.length + " first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
-softmax_inplace(logits);
+softmax_inplace(logits, temp);
 log("✨ After softmax first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
 const nextId=top_p_sample(logits, topP);
 log("🎯 Sampled token ID: " + nextId);
