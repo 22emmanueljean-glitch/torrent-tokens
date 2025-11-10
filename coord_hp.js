@@ -158,6 +158,8 @@ function onPeerMessage(peerId){
 log("🧮 Hidden state length: " + hidden.length);
 const logits=logits_from_hidden(hidden);
 log("🎲 Logits length: " + logits.length + " first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
+log("🌡️ Temperature value: " + temp);
+log("🎲 Logits max: " + Math.max(...logits) + " min: " + Math.min(...logits));
 softmax_inplace(logits, temp);
 log("✨ After softmax first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
 const nextId=top_p_sample(logits, topP);
