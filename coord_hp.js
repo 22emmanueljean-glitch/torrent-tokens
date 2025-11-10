@@ -1,7 +1,7 @@
 import { MSG } from "./wire_v2.js";
 import { loadGPT2Tokenizer } from "./tokenizer_gpt2.js";
 
-const BUILD = "2025-09-09-prod-10";
+const BUILD = "2025-09-09-prod-11";
 const PROTO = 2;
 
 const $ = (id) => document.getElementById(id);
@@ -27,8 +27,12 @@ let promptTokens=[];
 let lastToken=null;
 let assembledText="";
 
-let dims={ dModel:768, nHeads:12, dHead:64, mlpHidden:3072, nLayers:1, vocab:50257, maxSeq:1024 };
+let dims={ dModel:768, nHeads:12, dHead:64, mlpHidden:3072, nLayers:6, vocab:50257, maxSeq:1024 };
 let WTE=null, WPE=null, wteReady=false;
+
+// Multi-layer state
+let currentLayer = 0;
+let hiddenState = null;
 
 function wsURL(){
   const proto = location.protocol==="https:"?"wss":"ws";
@@ -53,7 +57,6 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
-  // Find max manually (Math.max(...p) fails on large arrays)
   let maxIdx = 0;
   let maxVal = p[0];
   for (let i = 1; i < p.length; i++) {
@@ -87,8 +90,6 @@ function startWS(){
   ws.onopen   = ()=>{ 
     log(`✅ Signaling connected (${wsURL()})`); 
     safeSendWS({ type:"join", role:"coord", roomId, peerId:coordId }); 
-    
-    // HEARTBEAT: Keep connection alive every 10 seconds
     wsHeartbeat = setInterval(() => {
       if (ws?.readyState === 1) {
         safeSendWS({ type:"ping" });
@@ -139,30 +140,61 @@ function onPeerMessage(peerId){
   return (ev)=>{
     if(typeof ev.data!=="string") return;
     let msg; try{ msg=JSON.parse(ev.data); }catch{ return; }
-    log("📩 Coord received: " + msg.type);
-    if(msg.type===MSG.SHARD_READY){ log(`✅ shard_ready from ${peerId} heads=${msg.heads[0]}-${msg.heads[1]}`); return; }
+    if(msg.type===MSG.SHARD_READY){ log(`✅ Layer ${currentLayer} ready on ${peerId}`); return; }
     if(msg.type===MSG.STATE_OUT){
       if(!wteReady){ log("⚠️ STATE_OUT received but WTE not ready"); return; }
-      const hidden=new Float32Array(msg.hidden);
-log("🧮 Hidden state length: " + hidden.length);
-const logits=logits_from_hidden(hidden);
-log("🎲 Logits length: " + logits.length + " first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
-log("🌡️ Temperature value: " + temp);
-log("🎲 Logits max: " + Math.max(...logits) + " min: " + Math.min(...logits));
-softmax_inplace(logits, temp);
-log("✨ After softmax first 5: [" + Array.from(logits.slice(0,5)).join(", ") + "]");
-const nextId=top_p_sample(logits, topP);
-log("🎯 Sampled token ID: " + nextId);
-      const piece=tokenizer?tokenizer.decode([nextId]):"";
-log("🔤 Token " + step + ": id=" + nextId + " text='" + piece + "'");
-assembledText+=piece;
-log("📝 Assembled so far: '" + assembledText + "'");
-renderOut(assembledText);
-      lastToken=nextId; step++; pos++; sendStep();
+      hiddenState = new Float32Array(msg.hidden);
+      log(`✅ Layer ${currentLayer} complete (step ${step})`);
+      
+      // Check if we've processed all layers
+      currentLayer++;
+      if(currentLayer < 6){
+        // Send to next layer
+        sendToLayer(currentLayer);
+      } else {
+        // All layers done - sample token
+        log(`🎯 All 6 layers complete, sampling token...`);
+        const logits=logits_from_hidden(hiddenState);
+        softmax_inplace(logits, temp);
+        const nextId=top_p_sample(logits, topP);
+        const piece=tokenizer?tokenizer.decode([nextId]):"";
+        log(`🔤 Token ${step}: "${piece}"`);
+        assembledText+=piece;
+        renderOut(assembledText);
+        lastToken=nextId; step++; pos++;
+        
+        // Start next token
+        currentLayer = 0;
+        sendStep();
+      }
       return;
     }
     if(msg.type===MSG.TELEMETRY){ log(`ℹ️ ${peerId}: ${typeof msg.note==="string"?msg.note:JSON.stringify(msg)}`); return; }
   };
+}
+
+async function sendToLayer(layerIdx){
+  log(`🔄 Sending to layer ${layerIdx}...`);
+  const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
+  if(readyPeers.length===0){ running=false; log("⚠️ No workers connected"); return; }
+  
+  // Load layer manifest
+  const man = await (await fetch(`./assets/weights/manifest_layer${layerIdx}.json`,{cache:"no-store"})).json();
+  const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
+  let start=0;
+  for(const [pid,p] of readyPeers){
+    const end=Math.min(total,start+per);
+    const weights=Object.assign({}, man.tensors||{});
+    delete weights.wte; delete weights.wpe;
+    p.dc.send(JSON.stringify({ type:MSG.LOAD_SHARD, layer:layerIdx, heads:[start,end], weights, dims }));
+    start=end;
+  }
+  
+  // Send hidden state to process
+  const payload=Array.from(hiddenState);
+  for(const [pid,p] of readyPeers){ 
+    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, embed:payload })); }catch{} 
+  }
 }
 
 $("btnStart")?.addEventListener("click", async ()=>{
@@ -178,12 +210,12 @@ $("btnStart")?.addEventListener("click", async ()=>{
     dims = Object.assign(dims, man.dims || {});
     const expected = 50257 * 768;
     const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
-    log("⏳ Loading WTE (147MB, may take 1-2 minutes)...");
+    log("⏳ Loading WTE (147MB)...");
     WTE = await fetchF32(wteUrl);
     wteReady = !!WTE && WTE.length === expected;
-    if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready on coordinator"); }
+    if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready"); }
     WPE = null;
-  }catch(e){ log("❌ Init fetch failed: " + (e.message||e)); wteReady=false; }
+  }catch(e){ log("❌ Init failed: " + (e.message||e)); wteReady=false; }
 });
 
 $("btnInit")?.addEventListener("click", async ()=>{
@@ -191,17 +223,15 @@ $("btnInit")?.addEventListener("click", async ()=>{
   const promptText = $("prompt")?.value || "";
   promptTokens = tokenizer ? tokenizer.encode(promptText) : [];
   lastToken=null;
-  log(`Prompt tokens: ${promptTokens.length}`);
+  log(`Prompt: ${promptTokens.length} tokens`);
   for (const [_, p] of peers.entries()){ if(p.ready){ p.dc.send(JSON.stringify({ type:MSG.INIT_MODEL, proto:PROTO, build:BUILD })); } }
 });
 
 $("btnLoad")?.addEventListener("click", async ()=>{
-  log("✅ CLICK: Load Shards");
+  log("✅ CLICK: Load Layer 0");
   const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
   if(readyPeers.length===0){ log("⚠️ No ready peers"); return; }
-  const man = await (await fetch("./assets/weights/manifest.json",{cache:"no-store"})).json();
-  const d = man.dims||{};
-  dims = { dModel:d.dModel||768, nHeads:d.nHeads||12, dHead:d.dHead||Math.floor((d.dModel||768)/(d.nHeads||12)), mlpHidden:d.mlpHidden||3072, nLayers:d.nLayers||1, vocab:d.vocab||50257, maxSeq:d.maxSeq||1024 };
+  const man = await (await fetch("./assets/weights/manifest_layer0.json",{cache:"no-store"})).json();
   const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
   let start=0;
   for(const [pid,p] of readyPeers){
@@ -209,35 +239,41 @@ $("btnLoad")?.addEventListener("click", async ()=>{
     const weights=Object.assign({}, man.tensors||{});
     delete weights.wte; delete weights.wpe;
     p.dc.send(JSON.stringify({ type:MSG.LOAD_SHARD, layer:0, heads:[start,end], weights, dims }));
-    log(`LOAD_SHARD → ${pid} heads=${start}..${end-1}`);
+    log(`LOAD_SHARD → ${pid} layer=0 heads=${start}..${end-1}`);
     start=end;
   }
 });
 
 $("btnDecode")?.addEventListener("click", ()=>{
-  log("✅ CLICK: Start Decode");
+  log("✅ CLICK: Start Decode (6 layers)");
   maxTokens = parseInt($("maxtok")?.value||"64",10)||64;
   temp = parseFloat($("temp")?.value||"1.0")||1.0;
   topP = parseFloat($("topp")?.value||"0.9")||0.9;
-  if(!wteReady){ log("⚠️ WTE not ready; wait for '✅ WTE ready on coordinator'"); return; }
-  if([...peers.values()].filter(p=>p.ready).length===0){ log("⚠️ No workers connected"); return; }
-  running=true; step=0; pos=0; assembledText=""; renderOut(assembledText);
+  if(!wteReady){ log("⚠️ WTE not ready"); return; }
+  if([...peers.values()].filter(p=>p.ready).length===0){ log("⚠️ No workers"); return; }
+  running=true; step=0; pos=0; assembledText=""; currentLayer=0;
+  renderOut(assembledText);
   sendStep();
 });
 
-$("btnStop")?.addEventListener("click", ()=>{ log("✅ CLICK: Stop Decode"); running=false; });
-$("btnClear")?.addEventListener("click", ()=>{ if(logBox) logBox.textContent=""; assembledText=""; renderOut(assembledText); log("🧹 Logs & output cleared"); });
+$("btnStop")?.addEventListener("click", ()=>{ log("✅ CLICK: Stop"); running=false; });
+$("btnClear")?.addEventListener("click", ()=>{ if(logBox) logBox.textContent=""; assembledText=""; renderOut(assembledText); log("🧹 Cleared"); });
 
 function currentTokenForPos(){ if(pos<promptTokens.length) return promptTokens[pos]; if(lastToken==null) return 50256; return lastToken; }
 function sendStep(){
   if(!running) return;
-  if(step>=maxTokens){ running=false; log("⏹️ decode finished"); return; }
+  if(step>=maxTokens){ running=false; log("⏹️ Finished"); return; }
   const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
-  if(readyPeers.length===0){ running=false; log("⚠️ No workers connected"); return; }
-  if(!wteReady){ running=false; log("❌ sendStep without WTE"); return; }
+  if(readyPeers.length===0){ running=false; log("⚠️ No workers"); return; }
+  if(!wteReady){ running=false; log("❌ No WTE"); return; }
+  
+  log(`▶️ Token ${step} starting (layer 0)...`);
   const tok=currentTokenForPos();
-  const x=embed_for_token(tok,pos);
-  const payload=Array.from(x);
-  for(const [pid,p] of readyPeers){ try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, embed:payload })); }catch{} }
-  log(`DECODE_STEP → ${readyPeers.length} worker(s) step=${step}`);
+  hiddenState=embed_for_token(tok,pos);
+  currentLayer = 0;
+  
+  const payload=Array.from(hiddenState);
+  for(const [pid,p] of readyPeers){ 
+    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, embed:payload })); }catch{} 
+  }
 }
