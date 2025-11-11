@@ -156,7 +156,7 @@ function onPeerMessage(peerId){
   return (ev)=>{
     if(typeof ev.data!=="string") return;
     let msg; try{ msg=JSON.parse(ev.data); }catch{ return; }
-    if(msg.type===MSG.SHARD_READY){ log(`✅ Layer ${currentLayer} ready on ${peerId}`); return; }
+    if(msg.type===MSG.SHARD_READY){ log(`✅ Layer ${msg.layer} ready on ${peerId}`); return; }
     if(msg.type===MSG.STATE_OUT){
       if(!wteReady){ log("⚠️ STATE_OUT received but WTE not ready"); return; }
       hiddenState = new Float32Array(msg.hidden);

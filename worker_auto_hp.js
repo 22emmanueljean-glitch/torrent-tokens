@@ -166,7 +166,7 @@ async function onChanMessage(e){
     }
     
     log("✅ Layer " + layerIdx + " loaded");
-    chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.heads || [0,12] }));
+chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.heads || [0,12] }));
     return;
   }
 
