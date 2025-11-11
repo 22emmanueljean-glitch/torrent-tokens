@@ -12,10 +12,10 @@ let roomId="default", peerId=null;
 function log(s){ addLog(s); }
 
 let dims=null;
-let W={};
+let W=[]; // Array of 6 layers - CHANGED FROM {}
 let kv=null;
 
-async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
+async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"force-cache"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
 function zeros(n){ return new Float32Array(n); }
 function ones(n){ const a=new Float32Array(n); a.fill(1); return a; }
 function gelu(x){ const c=Math.sqrt(2/Math.PI); return 0.5*x*(1+Math.tanh(c*(x+0.044715*x*x*x))); }
@@ -29,13 +29,13 @@ function ensureKV(){ if(kv) return; const H=dims.nHeads,L=dims.maxSeq; kv={K:new
 function kv_append(kh,vh){ const t=kv.len; for(let h=0;h<dims.nHeads;h++){ kv.K[h][t]=kh[h]; kv.V[h][t]=vh[h]; } kv.len++; }
 function self_attn(q,kf,vf,H,dh,T){ const scale=1/Math.sqrt(dh); const ctx=new Float32Array(H*dh); for(let h=0;h<H;h++){ const qh=q.subarray(h*dh,(h+1)*dh); const scores=new Float32Array(T); for(let t=0;t<T;t++){ let dot=0; const Kt=kf[h][t]; for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; scores[t]=dot*scale; } let m=-1e30; for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; let s=0; for(let i=0;i<scores.length;i++){ scores[i]=Math.exp(scores[i]-m); s+=scores[i]; } s=s||1; const out=ctx.subarray(h*dh,(h+1)*dh); out.fill(0); for(let t=0;t<T;t++){ const wt=scores[t]/s; const Vt=vf[h][t]; for(let j=0;j<dh;j++) out[j]+=wt*Vt[j]; } } return ctx; }
 
-function forward_from_embed(x){
+function forward_from_embed(x, layerWeights){
   const D=dims.dModel,H=dims.nHeads,dh=dims.dHead;
   const x1=x.slice();
-  layernorm_inplace(x1,W.ln1_g,W.ln1_b);
+  layernorm_inplace(x1,layerWeights.ln1_g,layerWeights.ln1_b);
   const qkv=new Float32Array(3*D);
-  gemv_right_rowmajor(x1,W.qkv,D,3*D,qkv);
-  add_inplace(qkv,W.qkv_b);
+  gemv_right_rowmajor(x1,layerWeights.qkv,D,3*D,qkv);
+  add_inplace(qkv,layerWeights.qkv_b);
   const s=split_qkv(qkv,D);
   const qH=new Array(H),kH=new Array(H),vH=new Array(H);
   for(let h=0;h<H;h++){
@@ -47,23 +47,23 @@ function forward_from_embed(x){
   kv_append(kH,vH);
   const ctx=self_attn(s.q,kv.K,kv.V,H,dh,kv.len);
   const aOut=new Float32Array(D);
-  gemv_right_rowmajor(ctx,W.o,D,D,aOut);
-  add_inplace(aOut,W.o_b);
+  gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
+  add_inplace(aOut,layerWeights.o_b);
   add_residual_inplace(aOut,x);
   const x2=aOut.slice();
-  layernorm_inplace(x2,W.ln2_g,W.ln2_b);
+  layernorm_inplace(x2,layerWeights.ln2_g,layerWeights.ln2_b);
   const ff=new Float32Array(dims.mlpHidden);
-  gemv_right_rowmajor(x2,W.ff1,D,dims.mlpHidden,ff);
-  add_inplace(ff,W.ff1_b);
+  gemv_right_rowmajor(x2,layerWeights.ff1,D,dims.mlpHidden,ff);
+  add_inplace(ff,layerWeights.ff1_b);
   for(let i=0;i<ff.length;i++) ff[i]=gelu(ff[i]);
   const mOut=new Float32Array(D);
-  gemv_right_rowmajor(ff,W.ff2,dims.mlpHidden,D,mOut);
-  add_inplace(mOut,W.ff2_b);
+  gemv_right_rowmajor(ff,layerWeights.ff2,dims.mlpHidden,D,mOut);
+  add_inplace(mOut,layerWeights.ff2_b);
   add_residual_inplace(mOut,aOut);
   return mOut;
 }
 
-function fillMissing(){ const D=dims.dModel,M=dims.mlpHidden; if(!W.ln1_g) W.ln1_g=ones(D); if(!W.ln1_b) W.ln1_b=zeros(D); if(!W.qkv_b) W.qkv_b=zeros(3*D); if(!W.o_b) W.o_b=zeros(D); if(!W.ln2_g) W.ln2_g=ones(D); if(!W.ln2_b) W.ln2_b=zeros(D); if(!W.ff1_b) W.ff1_b=zeros(M); if(!W.ff2_b) W.ff2_b=zeros(D); }
+function fillMissing(layerWeights){ const D=dims.dModel,M=dims.mlpHidden; if(!layerWeights.ln1_g) layerWeights.ln1_g=ones(D); if(!layerWeights.ln1_b) layerWeights.ln1_b=zeros(D); if(!layerWeights.qkv_b) layerWeights.qkv_b=zeros(3*D); if(!layerWeights.o_b) layerWeights.o_b=zeros(D); if(!layerWeights.ln2_g) layerWeights.ln2_g=ones(D); if(!layerWeights.ln2_b) layerWeights.ln2_b=zeros(D); if(!layerWeights.ff1_b) layerWeights.ff1_b=zeros(M); if(!layerWeights.ff2_b) layerWeights.ff2_b=zeros(D); }
 
 function connectWS(){
   try{ ws?.close(); }catch{}
@@ -107,7 +107,7 @@ joinBtn.onclick = async () => {
   connectWS();
 };
 reconnectBtn.onclick = () => { log("↻ Reconnect requested"); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} setTimeout(connectWS,200); };
-hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
+hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
 nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
 
 async function onChanMessage(e){
@@ -129,68 +129,72 @@ async function onChanMessage(e){
 
   if (msg.type===MSG.INIT_MODEL){
     kv=null;
+    W=[]; 
     return;
   }
 
   if (msg.type===MSG.LOAD_SHARD){
-    dims = msg.dims || { dModel:768,nHeads:12,dHead:64,mlpHidden:3072,nLayers:1,vocab:50257,maxSeq:1024 };
+    const layerIdx = msg.layer || 0;
+    dims = msg.dims || { dModel:768,nHeads:12,dHead:64,mlpHidden:3072,nLayers:6,vocab:50257,maxSeq:1024 };
     const T = msg.weights || {};
-    log("📥 LOAD_SHARD received");
-    log("🔍 Weight URLs: qkv=" + (T.qkv || "MISSING") + " o=" + (T.o || "MISSING"));
+    log("📥 LOAD_SHARD layer=" + layerIdx);
+    
+    if(!W[layerIdx]) W[layerIdx] = {};
+    const layerW = W[layerIdx];
+    
     const req = k => (T && typeof T[k]==="string") ? T[k] : null;
 
-    log("⬇️ Downloading qkv...");
-    W.qkv = await fetchMaybe(req("qkv"));
-    log("✅ qkv result: " + (W.qkv ? W.qkv.length + " floats" : "FAILED"));
-    W.o   = await fetchMaybe(req("o"));
-    W.ff1 = await fetchMaybe(req("ff1"));
-    W.ff2 = await fetchMaybe(req("ff2"));
+    log("⬇️ Downloading layer " + layerIdx + " weights...");
+    layerW.qkv = await fetchMaybe(req("qkv"));
+    layerW.o   = await fetchMaybe(req("o"));
+    layerW.ff1 = await fetchMaybe(req("ff1"));
+    layerW.ff2 = await fetchMaybe(req("ff2"));
+    layerW.ln1_g = await fetchMaybe(req("ln1_g"));
+    layerW.ln1_b = await fetchMaybe(req("ln1_b"));
+    layerW.qkv_b = await fetchMaybe(req("qkv_b"));
+    layerW.o_b   = await fetchMaybe(req("o_b"));
+    layerW.ln2_g = await fetchMaybe(req("ln2_g"));
+    layerW.ln2_b = await fetchMaybe(req("ln2_b"));
+    layerW.ff1_b = await fetchMaybe(req("ff1_b"));
+    layerW.ff2_b = await fetchMaybe(req("ff2_b"));
 
-    W.ln1_g = await fetchMaybe(req("ln1_g"));
-    W.ln1_b = await fetchMaybe(req("ln1_b"));
-    W.qkv_b = await fetchMaybe(req("qkv_b"));
-    W.o_b   = await fetchMaybe(req("o_b"));
-    W.ln2_g = await fetchMaybe(req("ln2_g"));
-    W.ln2_b = await fetchMaybe(req("ln2_b"));
-    W.ff1_b = await fetchMaybe(req("ff1_b"));
-    W.ff2_b = await fetchMaybe(req("ff2_b"));
+    fillMissing(layerW);
 
-    fillMissing();
-
-    log("✅ All weights downloaded, verifying...");
-    const have = { qkv: !!W.qkv, o: !!W.o, ff1: !!W.ff1, ff2: !!W.ff2 };
-    log("🔍 Final check: qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
-    
-    if(!have.qkv || !have.o || !have.ff1 || !have.ff2){
-      log("❌ Missing required tensors!");
+    if(!layerW.qkv || !layerW.o || !layerW.ff1 || !layerW.ff2){
+      log("❌ Layer " + layerIdx + " missing tensors!");
       return;
     }
     
-    log("✅ All required weights loaded, sending SHARD_READY");
-    chan?.send(JSON.stringify({ type: MSG.SHARD_READY, heads: msg.heads || [0,0] }));
+    log("✅ Layer " + layerIdx + " loaded");
+    chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.heads || [0,12] }));
     return;
   }
 
   if (msg.type===MSG.DECODE_STEP){
-    log("🔍 DECODE_STEP received for step " + msg.stepId);
-    log("🔍 Weight status: dims=" + !!dims + " qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
-    if(!dims || !W.qkv || !W.o || !W.ff1 || !W.ff2) {
-      log("❌ BLOCKED: Missing weights! dims=" + !!dims + " qkv=" + !!W.qkv + " o=" + !!W.o + " ff1=" + !!W.ff1 + " ff2=" + !!W.ff2);
+    const layerIdx = msg.layer || 0;
+    log("🔍 DECODE_STEP layer=" + layerIdx + " step=" + msg.stepId);
+    
+    if(!dims || !W[layerIdx]) {
+      log("❌ Layer " + layerIdx + " not loaded!");
       return;
     }
-    log("✅ All weights present, checking embed...");
+    
+    const layerW = W[layerIdx];
+    if(!layerW.qkv || !layerW.o || !layerW.ff1 || !layerW.ff2) {
+      log("❌ Layer " + layerIdx + " incomplete!");
+      return;
+    }
+    
     const emb = Array.isArray(msg.embed) ? new Float32Array(msg.embed) : null;
     if(!emb) {
-      log("❌ BLOCKED: No embed in message!");
+      log("❌ No embed!");
       return;
     }
-    log("✅ Embed received (" + emb.length + " floats), computing...");
-    if(!emb) return;
-    if(kv==null) ensureKV();
-    const h = forward_from_embed(emb);
-    log("✅ Computed hidden state, sending STATE_OUT...");
+    
+    if(layerIdx === 0 && kv==null) ensureKV();
+    
+    const h = forward_from_embed(emb, layerW);
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
-    log("✅ STATE_OUT sent for step " + msg.stepId);
     return;
   }
 }
