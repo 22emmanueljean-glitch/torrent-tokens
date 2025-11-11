@@ -219,20 +219,26 @@ $("btnInit")?.addEventListener("click", async ()=>{
 });
 
 $("btnLoad")?.addEventListener("click", async ()=>{
-  log("✅ CLICK: Load Layer 0");
+  log("✅ CLICK: Load ALL 6 Layers");
   const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
   if(readyPeers.length===0){ log("⚠️ No ready peers"); return; }
-  const man = await (await fetch("./assets/weights/manifest_layer0.json",{cache:"no-store"})).json();
-  const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
-  let start=0;
-  for(const [pid,p] of readyPeers){
-    const end=Math.min(total,start+per);
-    const weights=Object.assign({}, man.tensors||{});
-    delete weights.wte; delete weights.wpe;
-    p.dc.send(JSON.stringify({ type:MSG.LOAD_SHARD, layer:0, heads:[start,end], weights, dims }));
-    log(`LOAD_SHARD → ${pid} layer=0 heads=${start}..${end-1}`);
-    start=end;
+  
+  // Load all 6 layers
+  for(let layerIdx = 0; layerIdx < 6; layerIdx++){
+    log(`📥 Loading layer ${layerIdx}...`);
+    const man = await (await fetch(`./assets/weights/manifest_layer${layerIdx}.json`,{cache:"no-store"})).json();
+    const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
+    let start=0;
+    for(const [pid,p] of readyPeers){
+      const end=Math.min(total,start+per);
+      const weights=Object.assign({}, man.tensors||{});
+      delete weights.wte; delete weights.wpe;
+      p.dc.send(JSON.stringify({ type:MSG.LOAD_SHARD, layer:layerIdx, heads:[start,end], weights, dims }));
+      start=end;
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
+  log("✅ All 6 layers loaded!");
 });
 
 $("btnDecode")?.addEventListener("click", ()=>{
