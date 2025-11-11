@@ -29,6 +29,7 @@ let assembledText="";
 
 let dims={ dModel:768, nHeads:12, dHead:64, mlpHidden:3072, nLayers:6, vocab:50257, maxSeq:1024 };
 let WTE=null, WPE=null, wteReady=false;
+let LN_F_G=null, LN_F_B=null;
 
 // Multi-layer state
 let currentLayer = 0;
@@ -170,7 +171,14 @@ function onPeerMessage(peerId){
       } else {
         // All layers done - sample token
         log(`🎯 All 6 layers complete, sampling token...`);
-        const logits=logits_from_hidden(hiddenState);
+// Apply final layer norm
+const normalized = new Float32Array(dims.dModel);
+for(let i=0; i<dims.dModel; i++) normalized[i] = hiddenState[i];
+let mu=0; for(let i=0;i<dims.dModel;i++) mu+=normalized[i]; mu/=dims.dModel;
+let vs=0; for(let i=0;i<dims.dModel;i++){ const t=normalized[i]-mu; vs+=t*t; }
+const inv=1/Math.sqrt(vs/dims.dModel+1e-5);
+for(let i=0;i<dims.dModel;i++) normalized[i]=(normalized[i]-mu)*inv*LN_F_G[i]+LN_F_B[i];
+const logits=logits_from_hidden(normalized);
 softmax_inplace(logits, temp);
 const nextId=top_p_sample(logits, topP);
 log(`🎯 Sampled ID: ${nextId} (vocab size: ${logits.length})`);
@@ -215,9 +223,15 @@ $("btnStart")?.addEventListener("click", async ()=>{
     const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
     log("⏳ Loading WTE (147MB)...");
     WTE = await fetchF32(wteUrl);
-    wteReady = !!WTE && WTE.length === expected;
-    if(!wteReady){ log(`❌ WTE not ready size=${WTE?.length||0} expected=${expected}`); } else { log("✅ WTE ready"); }
-    WPE = null;
+wteReady = !!WTE && WTE.length === expected;
+if(!wteReady){ log(`❌ WTE not ready`); } else { log("✅ WTE ready"); }
+WPE = null;
+
+const lnfgUrl = man.tensors?.ln_f_g || "./assets/weights/ln_f_g.bin";
+const lnfbUrl = man.tensors?.ln_f_b || "./assets/weights/ln_f_b.bin";
+LN_F_G = await fetchF32(lnfgUrl);
+LN_F_B = await fetchF32(lnfbUrl);
+log("✅ Final layer norm loaded");
   }catch(e){ log("❌ Init failed: " + (e.message||e)); wteReady=false; }
 });
 
