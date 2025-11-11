@@ -57,15 +57,20 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
-  let maxIdx = 0;
-  let maxVal = p[0];
-  for (let i = 1; i < p.length; i++) {
-    if (p[i] > maxVal) {
-      maxVal = p[i];
-      maxIdx = i;
-    }
+  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
+  let cum = 0, cut = idx.length;
+  for (let i = 0; i < idx.length; i++) {
+    cum += idx[i][0];
+    if (cum >= top) { cut = i + 1; break; }
   }
-  return maxIdx;
+  const kept = idx.slice(0, cut);
+  let s = kept.reduce((acc, item) => acc + item[0], 0) || 1;
+  let r = Math.random() * s;
+  for (const item of kept) {
+    if (r <= item[0]) return item[1];
+    r -= item[0];
+  }
+  return kept[kept.length - 1][1];
 }
 
 async function fetchF32(url){ 
@@ -173,27 +178,13 @@ function onPeerMessage(peerId){
   };
 }
 
-async function sendToLayer(layerIdx){
-  log(`🔄 Sending to layer ${layerIdx}...`);
+function sendToLayer(layerIdx){
   const readyPeers=[...peers.entries()].filter(([_,p])=>p.ready);
-  if(readyPeers.length===0){ running=false; log("⚠️ No workers connected"); return; }
+  if(readyPeers.length===0){ running=false; log("⚠️ No workers"); return; }
   
-  // Load layer manifest
-  const man = await (await fetch(`./assets/weights/manifest_layer${layerIdx}.json`,{cache:"no-store"})).json();
-  const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
-  let start=0;
-  for(const [pid,p] of readyPeers){
-    const end=Math.min(total,start+per);
-    const weights=Object.assign({}, man.tensors||{});
-    delete weights.wte; delete weights.wpe;
-    p.dc.send(JSON.stringify({ type:MSG.LOAD_SHARD, layer:layerIdx, heads:[start,end], weights, dims }));
-    start=end;
-  }
-  
-  // Send hidden state to process
   const payload=Array.from(hiddenState);
   for(const [pid,p] of readyPeers){ 
-    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, embed:payload })); }catch{} 
+    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, layer:layerIdx, embed:payload })); }catch{} 
   }
 }
 
