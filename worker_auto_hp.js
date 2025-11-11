@@ -93,7 +93,7 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     kH[h]=s.k.subarray(h*dh,(h+1)*dh);
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
-  ensureKV(layerIdx);
+  ensureKV(layerIdx); // This MUST happen before self_attn!
   if(appendKV) kv_append(layerIdx, kH, vH);
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
@@ -231,7 +231,8 @@ async function onChanMessage(e){
       return;
     }
     
-    ensureKV(layerIdx);
+    // Ensure ALL layers have KV caches initialized
+    for(let i=0; i<6; i++) ensureKV(i);
     
     const appendKV = layerIdx === 0;
     const h = forward_from_embed(emb, layerW, layerIdx, appendKV);
