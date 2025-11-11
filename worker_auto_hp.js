@@ -29,7 +29,7 @@ function ensureKV(){ if(kv) return; const H=dims.nHeads,L=dims.maxSeq; kv={K:new
 function kv_append(kh,vh){ const t=kv.len; for(let h=0;h<dims.nHeads;h++){ kv.K[h][t]=kh[h]; kv.V[h][t]=vh[h]; } kv.len++; }
 function self_attn(q,kf,vf,H,dh,T){ const scale=1/Math.sqrt(dh); const ctx=new Float32Array(H*dh); for(let h=0;h<H;h++){ const qh=q.subarray(h*dh,(h+1)*dh); const scores=new Float32Array(T); for(let t=0;t<T;t++){ let dot=0; const Kt=kf[h][t]; for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; scores[t]=dot*scale; } let m=-1e30; for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; let s=0; for(let i=0;i<scores.length;i++){ scores[i]=Math.exp(scores[i]-m); s+=scores[i]; } s=s||1; const out=ctx.subarray(h*dh,(h+1)*dh); out.fill(0); for(let t=0;t<T;t++){ const wt=scores[t]/s; const Vt=vf[h][t]; for(let j=0;j<dh;j++) out[j]+=wt*Vt[j]; } } return ctx; }
 
-function forward_from_embed(x, layerWeights){
+function forward_from_embed(x, layerWeights, appendKV){
   const D=dims.dModel,H=dims.nHeads,dh=dims.dHead;
   const x1=x.slice();
   layernorm_inplace(x1,layerWeights.ln1_g,layerWeights.ln1_b);
@@ -44,7 +44,7 @@ function forward_from_embed(x, layerWeights){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV();
-  kv_append(kH,vH);
+  if(appendKV) kv_append(kH,vH);
   const ctx=self_attn(s.q,kv.K,kv.V,H,dh,kv.len);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
