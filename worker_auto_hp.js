@@ -13,8 +13,8 @@ function log(s){ addLog(s); }
 
 let dims=null;
 let W=[]; // Array of 6 layers
-let kvCaches = Array(6).fill(null);
-let kvLen = 0; // Shared sequence length across all layers
+let kvCaches = Array(6).fill(null); // Separate KV cache per layer
+let kvLen = 0; // Shared sequence length
 
 async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"force-cache"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
 function zeros(n){ return new Float32Array(n); }
@@ -29,7 +29,7 @@ function split_qkv(v,d){ return { q:v.subarray(0,d), k:v.subarray(d,2*d), v:v.su
 function ensureKV(layerIdx){ 
   if(kvCaches[layerIdx]) return; 
   const H=dims.nHeads,L=dims.maxSeq; 
-  kvCaches[layerIdx]={K:new Array(H),V:new Array(H)}; // NO len property
+  kvCaches[layerIdx]={K:new Array(H),V:new Array(H)}; 
   for(let h=0;h<H;h++){ 
     kvCaches[layerIdx].K[h]=new Array(L); 
     kvCaches[layerIdx].V[h]=new Array(L); 
@@ -46,7 +46,9 @@ function kv_append(layerIdx, kh, vh){
 
 function self_attn(layerIdx, q, H, dh){ 
   const kv = kvCaches[layerIdx];
-  const T = kvLen; // Use global kvLen, not kv.len
+  const T = kvLen;
+  if(T === 0) return new Float32Array(H*dh); // No context yet
+  
   const scale=1/Math.sqrt(dh); 
   const ctx=new Float32Array(H*dh); 
   for(let h=0;h<H;h++){ 
@@ -92,10 +94,7 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV(layerIdx);
-  if(appendKV) {
-    kv_append(layerIdx, kH, vH);
-    kvLen++; // Increment AFTER appending
-  }
+  if(appendKV) kv_append(layerIdx, kH, vH);
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
@@ -158,7 +157,7 @@ joinBtn.onclick = async () => {
   connectWS();
 };
 reconnectBtn.onclick = () => { log("↻ Reconnect requested"); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} setTimeout(connectWS,200); };
-hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; kvCaches=Array(6).fill(null); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
+hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; kvCaches=Array(6).fill(null); kvLen=0; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
 nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
 
 async function onChanMessage(e){
@@ -170,7 +169,7 @@ async function onChanMessage(e){
 
   if (msg.type===MSG.INIT_MODEL){
     kvCaches = Array(6).fill(null);
-    kvLen = 0; // Reset
+    kvLen = 0;
     W=[]; 
     return;
   }
@@ -234,7 +233,10 @@ async function onChanMessage(e){
     
     ensureKV(layerIdx);
     
-    const h = forward_from_embed(emb, layerW, layerIdx, layerIdx === 0);
+    const appendKV = layerIdx === 0;
+    const h = forward_from_embed(emb, layerW, layerIdx, appendKV);
+    if(appendKV) kvLen++; // Increment after layer 0 completes
+    
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
     return;
   }
