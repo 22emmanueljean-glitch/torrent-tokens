@@ -12,8 +12,8 @@ let roomId="default", peerId=null;
 function log(s){ addLog(s); }
 
 let dims=null;
-let W=[]; // Array of 6 layers - CHANGED FROM {}
-let kv=null;
+let W=[]; // Array of 6 layers
+let kvCaches = Array(6).fill(null); // Separate KV cache per layer
 
 async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"force-cache"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
 function zeros(n){ return new Float32Array(n); }
@@ -25,11 +25,60 @@ function add_inplace(y,b){ for(let i=0;i<y.length;i++) y[i]+=b[i]; }
 function add_residual_inplace(y,x){ for(let i=0;i<y.length;i++) y[i]+=x[i]; }
 function split_qkv(v,d){ return { q:v.subarray(0,d), k:v.subarray(d,2*d), v:v.subarray(2*d,3*d) }; }
 
-function ensureKV(){ if(kv) return; const H=dims.nHeads,L=dims.maxSeq; kv={K:new Array(H),V:new Array(H),len:0}; for(let h=0;h<H;h++){ kv.K[h]=new Array(L); kv.V[h]=new Array(L); } }
-function kv_append(kh,vh){ const t=kv.len; for(let h=0;h<dims.nHeads;h++){ kv.K[h][t]=kh[h]; kv.V[h][t]=vh[h]; } kv.len++; }
-function self_attn(q,kf,vf,H,dh,T){ const scale=1/Math.sqrt(dh); const ctx=new Float32Array(H*dh); for(let h=0;h<H;h++){ const qh=q.subarray(h*dh,(h+1)*dh); const scores=new Float32Array(T); for(let t=0;t<T;t++){ let dot=0; const Kt=kf[h][t]; for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; scores[t]=dot*scale; } let m=-1e30; for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; let s=0; for(let i=0;i<scores.length;i++){ scores[i]=Math.exp(scores[i]-m); s+=scores[i]; } s=s||1; const out=ctx.subarray(h*dh,(h+1)*dh); out.fill(0); for(let t=0;t<T;t++){ const wt=scores[t]/s; const Vt=vf[h][t]; for(let j=0;j<dh;j++) out[j]+=wt*Vt[j]; } } return ctx; }
+function ensureKV(layerIdx){ 
+  if(kvCaches[layerIdx]) return; 
+  const H=dims.nHeads,L=dims.maxSeq; 
+  kvCaches[layerIdx]={K:new Array(H),V:new Array(H),len:0}; 
+  for(let h=0;h<H;h++){ 
+    kvCaches[layerIdx].K[h]=new Array(L); 
+    kvCaches[layerIdx].V[h]=new Array(L); 
+  } 
+}
 
-function forward_from_embed(x, layerWeights, appendKV){
+function kv_append(layerIdx, kh, vh){ 
+  const kv = kvCaches[layerIdx];
+  const t=kv.len; 
+  for(let h=0;h<dims.nHeads;h++){ 
+    kv.K[h][t]=kh[h]; 
+    kv.V[h][t]=vh[h]; 
+  } 
+  kv.len++; 
+}
+
+function self_attn(layerIdx, q, H, dh){ 
+  const kv = kvCaches[layerIdx];
+  const T = kv.len;
+  const scale=1/Math.sqrt(dh); 
+  const ctx=new Float32Array(H*dh); 
+  for(let h=0;h<H;h++){ 
+    const qh=q.subarray(h*dh,(h+1)*dh); 
+    const scores=new Float32Array(T); 
+    for(let t=0;t<T;t++){ 
+      let dot=0; 
+      const Kt=kv.K[h][t]; 
+      for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; 
+      scores[t]=dot*scale; 
+    } 
+    let m=-1e30; 
+    for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; 
+    let s=0; 
+    for(let i=0;i<scores.length;i++){ 
+      scores[i]=Math.exp(scores[i]-m); 
+      s+=scores[i]; 
+    } 
+    s=s||1; 
+    const out=ctx.subarray(h*dh,(h+1)*dh); 
+    out.fill(0); 
+    for(let t=0;t<T;t++){ 
+      const wt=scores[t]/s; 
+      const Vt=kv.V[h][t]; 
+      for(let j=0;j<dh;j++) out[j]+=wt*Vt[j]; 
+    } 
+  } 
+  return ctx; 
+}
+
+function forward_from_embed(x, layerWeights, layerIdx, appendKV){
   const D=dims.dModel,H=dims.nHeads,dh=dims.dHead;
   const x1=x.slice();
   layernorm_inplace(x1,layerWeights.ln1_g,layerWeights.ln1_b);
@@ -43,9 +92,9 @@ function forward_from_embed(x, layerWeights, appendKV){
     kH[h]=s.k.subarray(h*dh,(h+1)*dh);
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
-  ensureKV();
-  if(appendKV) kv_append(kH,vH);
-  const ctx=self_attn(s.q,kv.K,kv.V,H,dh,kv.len);
+  ensureKV(layerIdx);
+  if(appendKV) kv_append(layerIdx, kH, vH);
+  const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
   add_inplace(aOut,layerWeights.o_b);
@@ -107,28 +156,18 @@ joinBtn.onclick = async () => {
   connectWS();
 };
 reconnectBtn.onclick = () => { log("↻ Reconnect requested"); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} setTimeout(connectWS,200); };
-hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
+hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; kvCaches=Array(6).fill(null); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
 nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
 
 async function onChanMessage(e){
-  log("📨 Raw message received, type: " + typeof e.data);
-  if(typeof e.data !== "string") {
-    log("⚠️ Non-string message ignored");
-    return;
-  }
+  if(typeof e.data !== "string") return;
   let msg; 
-  try{ 
-    msg=JSON.parse(e.data); 
-    log("📩 Parsed message type: " + (msg?.type || "unknown"));
-  }catch(err){ 
-    log("❌ JSON parse failed: " + err.message);
-    return; 
-  }
+  try{ msg=JSON.parse(e.data); }catch{ return; }
 
   if (msg.type===MSG.PING){ chan?.send(JSON.stringify({type:MSG.PONG})); return; }
 
   if (msg.type===MSG.INIT_MODEL){
-    kv=null;
+    kvCaches = Array(6).fill(null);
     W=[]; 
     return;
   }
@@ -166,13 +205,12 @@ async function onChanMessage(e){
     }
     
     log("✅ Layer " + layerIdx + " loaded");
-chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.heads || [0,12] }));
+    chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.heads || [0,12] }));
     return;
   }
 
   if (msg.type===MSG.DECODE_STEP){
     const layerIdx = typeof msg.layer === 'number' ? msg.layer : 0;
-    log("🔍 DECODE_STEP layer=" + layerIdx + " step=" + msg.stepId);
     
     if(!dims || !W[layerIdx]) {
       log("❌ Layer " + layerIdx + " not loaded!");
@@ -191,10 +229,9 @@ chan?.send(JSON.stringify({ type: MSG.SHARD_READY, layer: layerIdx, heads: msg.h
       return;
     }
     
-    if(kv==null) ensureKV();
-
-// Only append to KV cache on layer 0
-const h = forward_from_embed(emb, layerW, layerIdx === 0);
+    ensureKV(layerIdx);
+    
+    const h = forward_from_embed(emb, layerW, layerIdx, layerIdx === 0);
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
     return;
   }
