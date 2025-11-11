@@ -191,9 +191,10 @@ async function onChanMessage(e){
       return;
     }
     
-    if(layerIdx === 0 && kv==null) ensureKV();
-    
-    const h = forward_from_embed(emb, layerW);
+    if(kv==null) ensureKV();
+
+// Only append to KV cache on layer 0
+const h = forward_from_embed(emb, layerW, layerIdx === 0);
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
     return;
   }
