@@ -233,7 +233,10 @@ $("btnStart")?.addEventListener("click", async ()=>{
     WTE = await fetchF32(wteUrl);
 wteReady = !!WTE && WTE.length === expected;
 if(!wteReady){ log(`❌ WTE not ready`); } else { log("✅ WTE ready"); }
-WPE = null;
+
+const wpeUrl = man.tensors?.wpe || "./assets/weights/wpe.bin";
+WPE = await fetchF32(wpeUrl);
+log("✅ WPE loaded");
 
 const lnfgUrl = man.tensors?.ln_f_g || "./assets/weights/ln_f_g.bin";
 const lnfbUrl = man.tensors?.ln_f_b || "./assets/weights/ln_f_b.bin";
