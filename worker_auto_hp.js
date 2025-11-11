@@ -13,7 +13,8 @@ function log(s){ addLog(s); }
 
 let dims=null;
 let W=[]; // Array of 6 layers
-let kvCaches = Array(6).fill(null); // Separate KV cache per layer
+let kvCaches = Array(6).fill(null);
+let kvLen = 0; // Shared sequence length across all layers
 
 async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"force-cache"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
 function zeros(n){ return new Float32Array(n); }
@@ -28,7 +29,7 @@ function split_qkv(v,d){ return { q:v.subarray(0,d), k:v.subarray(d,2*d), v:v.su
 function ensureKV(layerIdx){ 
   if(kvCaches[layerIdx]) return; 
   const H=dims.nHeads,L=dims.maxSeq; 
-  kvCaches[layerIdx]={K:new Array(H),V:new Array(H),len:0}; 
+  kvCaches[layerIdx]={K:new Array(H),V:new Array(H)}; // NO len property
   for(let h=0;h<H;h++){ 
     kvCaches[layerIdx].K[h]=new Array(L); 
     kvCaches[layerIdx].V[h]=new Array(L); 
@@ -37,17 +38,15 @@ function ensureKV(layerIdx){
 
 function kv_append(layerIdx, kh, vh){ 
   const kv = kvCaches[layerIdx];
-  const t=kv.len; 
   for(let h=0;h<dims.nHeads;h++){ 
-    kv.K[h][t]=kh[h]; 
-    kv.V[h][t]=vh[h]; 
+    kv.K[h][kvLen]=kh[h]; 
+    kv.V[h][kvLen]=vh[h]; 
   } 
-  kv.len++; 
 }
 
 function self_attn(layerIdx, q, H, dh){ 
   const kv = kvCaches[layerIdx];
-  const T = kv.len;
+  const T = kvLen; // Use global kvLen, not kv.len
   const scale=1/Math.sqrt(dh); 
   const ctx=new Float32Array(H*dh); 
   for(let h=0;h<H;h++){ 
@@ -93,7 +92,10 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV(layerIdx);
-  if(appendKV) kv_append(layerIdx, kH, vH);
+  if(appendKV) {
+    kv_append(layerIdx, kH, vH);
+    kvLen++; // Increment AFTER appending
+  }
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
@@ -168,6 +170,7 @@ async function onChanMessage(e){
 
   if (msg.type===MSG.INIT_MODEL){
     kvCaches = Array(6).fill(null);
+    kvLen = 0; // Reset
     W=[]; 
     return;
   }
