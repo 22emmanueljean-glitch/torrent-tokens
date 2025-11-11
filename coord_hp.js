@@ -57,20 +57,19 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
-  const idx = p.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]);
-  let cum = 0, cut = idx.length;
-  for (let i = 0; i < idx.length; i++) {
-    cum += idx[i][0];
-    if (cum >= top) { cut = i + 1; break; }
+  // Find argmax
+  let maxIdx = 0;
+  let maxVal = p[0];
+  for (let i = 1; i < p.length; i++) {
+    if (p[i] > maxVal) {
+      maxVal = p[i];
+      maxIdx = i;
+    }
   }
-  const kept = idx.slice(0, cut);
-  let s = kept.reduce((acc, item) => acc + item[0], 0) || 1;
-  let r = Math.random() * s;
-  for (const item of kept) {
-    if (r <= item[0]) return item[1];
-    r -= item[0];
-  }
-  return kept[kept.length - 1][1];
+  
+  // For now, just return argmax (greedy)
+  // TODO: Implement proper top-p sampling later
+  return maxIdx;
 }
 
 async function fetchF32(url){ 
