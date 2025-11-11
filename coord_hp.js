@@ -57,19 +57,31 @@ function softmax_inplace(a, temperature) {
 }
 
 function top_p_sample(p, top) {
-  // Find argmax
-  let maxIdx = 0;
-  let maxVal = p[0];
-  for (let i = 1; i < p.length; i++) {
-    if (p[i] > maxVal) {
-      maxVal = p[i];
-      maxIdx = i;
+  // Create array of [probability, index] and sort by probability descending
+  const sorted = Array.from(p).map((prob, idx) => [prob, idx]).sort((a, b) => b[0] - a[0]);
+  
+  // Accumulate probabilities until we reach top_p threshold
+  let cumSum = 0;
+  let cutoff = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    cumSum += sorted[i][0];
+    if (cumSum >= top) {
+      cutoff = i + 1;
+      break;
     }
   }
   
-  // For now, just return argmax (greedy)
-  // TODO: Implement proper top-p sampling later
-  return maxIdx;
+  // Sample from top-p tokens
+  const candidates = sorted.slice(0, Math.max(1, cutoff));
+  const totalProb = candidates.reduce((sum, item) => sum + item[0], 0);
+  let r = Math.random() * totalProb;
+  
+  for (const [prob, idx] of candidates) {
+    r -= prob;
+    if (r <= 0) return idx;
+  }
+  
+  return candidates[0][1]; // fallback
 }
 
 async function fetchF32(url){ 
