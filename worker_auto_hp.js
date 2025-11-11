@@ -171,7 +171,7 @@ async function onChanMessage(e){
   }
 
   if (msg.type===MSG.DECODE_STEP){
-    const layerIdx = msg.layer || 0;
+    const layerIdx = typeof msg.layer === 'number' ? msg.layer : 0;
     log("🔍 DECODE_STEP layer=" + layerIdx + " step=" + msg.stepId);
     
     if(!dims || !W[layerIdx]) {

@@ -160,9 +160,10 @@ function onPeerMessage(peerId){
         // All layers done - sample token
         log(`🎯 All 6 layers complete, sampling token...`);
         const logits=logits_from_hidden(hiddenState);
-        softmax_inplace(logits, temp);
-        const nextId=top_p_sample(logits, topP);
-        const piece=tokenizer?tokenizer.decode([nextId]):"";
+softmax_inplace(logits, temp);
+const nextId=top_p_sample(logits, topP);
+log(`🎯 Sampled ID: ${nextId} (vocab size: ${logits.length})`);
+const piece=tokenizer?tokenizer.decode([nextId]):"";
         log(`🔤 Token ${step}: "${piece}"`);
         assembledText+=piece;
         renderOut(assembledText);
@@ -271,6 +272,6 @@ function sendStep(){
   
   const payload=Array.from(hiddenState);
   for(const [pid,p] of readyPeers){ 
-    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, embed:payload })); }catch{} 
+    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, layer:0, embed:payload })); }catch{}
   }
 }
