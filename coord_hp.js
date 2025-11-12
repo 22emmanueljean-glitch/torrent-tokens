@@ -214,8 +214,9 @@ $("btnStart")?.addEventListener("click", async ()=>{
   startWS();
   try{
     const man = await (await fetch("./assets/weights/manifest.json",{cache:"no-store"})).json();
-    const v = man.tokenizer?.vocab || "./assets/tokenizer/vocab.json";
-    const m = man.tokenizer?.merges || "./assets/tokenizer/merges.txt";
+    const cacheBust = Date.now();
+const v = man.tokenizer?.vocab || `./assets/tokenizer/vocab.json?v=${cacheBust}`;
+const m = man.tokenizer?.merges || `./assets/tokenizer/merges.txt?v=${cacheBust}`;
     tokenizer = await loadGPT2Tokenizer(v,m);
     log("✅ Tokenizer loaded");
 
