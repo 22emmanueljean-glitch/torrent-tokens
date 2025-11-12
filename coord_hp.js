@@ -218,6 +218,14 @@ $("btnStart")?.addEventListener("click", async ()=>{
     const m = man.tokenizer?.merges || "./assets/tokenizer/merges.txt";
     tokenizer = await loadGPT2Tokenizer(v,m);
     log("✅ Tokenizer loaded");
+
+// DEBUG: Test tokenizer
+const testPrompt = 'The capital of France is';
+const testTokens = tokenizer.encode(testPrompt);
+log(`🔍 Test tokenization: "${testPrompt}" -> [${testTokens.join(', ')}]`);
+for(let i=0; i<Math.min(5, testTokens.length); i++) {
+  log(`  Token ${i}: ${testTokens[i]} = "${tokenizer.decode([testTokens[i]])}"`);
+}
     dims = Object.assign(dims, man.dims || {});
     const expected = 50257 * 768;
     const wteUrl = man.tensors?.wte || "./assets/weights/wte.bin";
