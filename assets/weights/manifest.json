@@ -19,6 +19,6 @@
   },
   "tokenizer": {
     "vocab": "./assets/tokenizer/vocab_v2.json",
-  "merges": "./assets/tokenizer/merges_v2.txt"
+    "merges": "./assets/tokenizer/merges_v2.txt"
   }
 }
