@@ -18,7 +18,7 @@
     "ln_f_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/ln_f_b.bin"
   },
   "tokenizer": {
-    "vocab": "./assets/tokenizer/vocab_v2.json",
-    "merges": "./assets/tokenizer/merges_v2.txt"
+    "vocab": "./assets/tokenizer/vocab.json",
+    "merges": "./assets/tokenizer/merges.txt"
   }
 }

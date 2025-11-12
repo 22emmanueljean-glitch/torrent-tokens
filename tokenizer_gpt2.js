@@ -1,6 +1,8 @@
 // tokenizer_gpt2.js — minimal GPT-2 BPE tokenizer (runtime loads files)
 export async function loadGPT2Tokenizer(vocabUrl, mergesUrl){
-  const bust = Date.now();
+    console.log("🔍 TOKENIZER DEBUG: Loading vocab from:", vocabUrl);
+    console.log("🔍 TOKENIZER DEBUG: Loading merges from:", mergesUrl);
+    const bust = Date.now();
   const [vocabRes, mergesRes] = await Promise.all([
     fetch(vocabUrl + "?v=" + bust, {cache:"no-store"}), 
     fetch(mergesUrl + "?v=" + bust, {cache:"no-store"})
