@@ -225,6 +225,8 @@ const testPrompt = 'The capital of France is';
 const testTokens = tokenizer.encode(testPrompt);
 log(`🔍 Test tokenization: "${testPrompt}" -> [${testTokens.join(', ')}]`);
 for(let i=0; i<Math.min(5, testTokens.length); i++) {
+  const man = await (await fetch("./assets/weights/manifest.json",{cache:"no-store"})).json();
+log(`🔍 DEBUG: Loaded manifest tokenizer paths: vocab=${man.tokenizer?.vocab}, merges=${man.tokenizer?.merges}`);
   log(`  Token ${i}: ${testTokens[i]} = "${tokenizer.decode([testTokens[i]])}"`);
 }
     dims = Object.assign(dims, man.dims || {});
