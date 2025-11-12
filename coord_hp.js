@@ -1,5 +1,5 @@
 import { MSG } from "./wire_v2.js";
-import { loadGPT2Tokenizer } from "./tokenizer_xenova.js";
+import { loadGPT2Tokenizer } from "./tokenizer_gpt2.js";
 
 const BUILD = "2025-09-09-v14";
 const PROTO = 2;
@@ -218,7 +218,7 @@ log(`🔍 DEBUG: Loaded manifest tokenizer paths: vocab=${man.tokenizer?.vocab},
 const cacheBust = Date.now();
 const v = man.tokenizer?.vocab || `./assets/tokenizer/vocab.json?v=${cacheBust}`;
 const m = man.tokenizer?.merges || `./assets/tokenizer/merges.txt?v=${cacheBust}`;
-tokenizer = await loadGPT2Tokenizer();
+tokenizer = await loadGPT2Tokenizer(v, m);
 log("✅ Tokenizer loaded");
 
 // DEBUG: Test tokenizer
