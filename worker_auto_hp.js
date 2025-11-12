@@ -48,8 +48,7 @@ function kv_append(kh, vh){
 
 function self_attn(layerIdx, q, H, dh){ 
   const kv = kvCaches[layerIdx];
-  const T = kvLen;
-  if(T === 0) return new Float32Array(H*dh); // No context yet
+  const T = kvLen + 1; // Include current token being processed
   
   const scale=1/Math.sqrt(dh); 
   const ctx=new Float32Array(H*dh); 
