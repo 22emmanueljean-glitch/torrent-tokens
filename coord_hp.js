@@ -176,7 +176,7 @@ const normalized = new Float32Array(dims.dModel);
 for(let i=0; i<dims.dModel; i++) normalized[i] = hiddenState[i];
 let mu=0; for(let i=0;i<dims.dModel;i++) mu+=normalized[i]; mu/=dims.dModel;
 let vs=0; for(let i=0;i<dims.dModel;i++){ const t=normalized[i]-mu; vs+=t*t; }
-const inv=1/Math.sqrt(vs/dims.dModel+1e-5);
+const inv=1/Math.sqrt(vs+1e-5);
 for(let i=0;i<dims.dModel;i++) normalized[i]=(normalized[i]-mu)*inv*LN_F_G[i]+LN_F_B[i];
 const logits=logits_from_hidden(normalized);
 softmax_inplace(logits, temp);
