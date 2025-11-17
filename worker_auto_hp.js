@@ -236,9 +236,9 @@ async function onChanMessage(e){
     // Ensure ALL layers have KV caches initialized
     for(let i=0; i<6; i++) ensureKV(i);
     
-    const appendKV = layerIdx === 0;
+    const appendKV = true;
     const h = forward_from_embed(emb, layerW, layerIdx, appendKV);
-    if(appendKV) kvLen++; // Increment after layer 0 completes
+    if(layerIdx === 5) kvLen++; // Increment after last layer // Increment after layer 0 completes
     
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
     return;
