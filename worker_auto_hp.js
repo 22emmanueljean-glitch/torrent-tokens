@@ -37,15 +37,13 @@ function ensureKV(layerIdx){
 }
 
 function kv_append(kh, vh){ 
-  for(let layerIdx=0; layerIdx<6; layerIdx++){
-    const kv = kvCaches[layerIdx];
-    for(let h=0;h<dims.nHeads;h++){ 
-      kv.K[h][kvLen]=kh[h]; 
-      kv.V[h][kvLen]=vh[h]; 
-    } 
-  }
+function kv_append(layerIdx, kh, vh){ 
+  const kv = kvCaches[layerIdx];
+  for(let h=0;h<dims.nHeads;h++){ 
+    kv.K[h][kvLen]=kh[h]; 
+    kv.V[h][kvLen]=vh[h]; 
+  } 
 }
-
 function self_attn(layerIdx, q, H, dh){ 
   const kv = kvCaches[layerIdx];
   const T = kvLen; // Use only already-stored tokens
@@ -96,7 +94,7 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV(layerIdx); // This MUST happen before self_attn!
-  if(appendKV) kv_append(kH, vH);
+  if(appendKV) kv_append(layerIdx, kH, vH);
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
