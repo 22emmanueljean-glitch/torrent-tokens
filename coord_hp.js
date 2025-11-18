@@ -170,19 +170,28 @@ function onPeerMessage(peerId){
         sendToLayer(currentLayer);
       } else {
         // All layers done - sample token
+        // Check if we're still processing the prompt
+        if(pos < promptTokens.length) {
+          log(`✅ Prompt token ${pos} processed`);
+          lastToken=null; step++; pos++;
+          currentLayer = 0;
+          sendStep();
+          return;
+        }
+        
         log(`🎯 All 6 layers complete, sampling token...`);
-// Apply final layer norm
-const normalized = new Float32Array(dims.dModel);
-for(let i=0; i<dims.dModel; i++) normalized[i] = hiddenState[i];
-let mu=0; for(let i=0;i<dims.dModel;i++) mu+=normalized[i]; mu/=dims.dModel;
-let vs=0; for(let i=0;i<dims.dModel;i++){ const t=normalized[i]-mu; vs+=t*t; }
-const inv=1/Math.sqrt(vs+1e-5);
-for(let i=0;i<dims.dModel;i++) normalized[i]=(normalized[i]-mu)*inv*LN_F_G[i]+LN_F_B[i];
-const logits=logits_from_hidden(normalized);
-softmax_inplace(logits, temp);
-const nextId=top_p_sample(logits, topP);
-log(`🎯 Sampled ID: ${nextId} (vocab size: ${logits.length})`);
-const piece=tokenizer?tokenizer.decode([nextId]):"";
+        // Apply final layer norm
+        const normalized = new Float32Array(dims.dModel);
+        for(let i=0; i<dims.dModel; i++) normalized[i] = hiddenState[i];
+        let mu=0; for(let i=0;i<dims.dModel;i++) mu+=normalized[i]; mu/=dims.dModel;
+        let vs=0; for(let i=0;i<dims.dModel;i++){ const t=normalized[i]-mu; vs+=t*t; }
+        const inv=1/Math.sqrt(vs+1e-5);
+        for(let i=0;i<dims.dModel;i++) normalized[i]=(normalized[i]-mu)*inv*LN_F_G[i]+LN_F_B[i];
+        const logits=logits_from_hidden(normalized);
+        softmax_inplace(logits, temp);
+        const nextId=top_p_sample(logits, topP);
+        log(`🎯 Sampled ID: ${nextId} (vocab size: ${logits.length})`);
+        const piece=tokenizer?tokenizer.decode([nextId]):"";
         log(`🔤 Token ${step}: "${piece}"`);
         assembledText+=piece;
         renderOut(assembledText);
