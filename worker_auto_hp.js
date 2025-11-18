@@ -36,7 +36,6 @@ function ensureKV(layerIdx){
   } 
 }
 
-function kv_append(kh, vh){ 
 function kv_append(layerIdx, kh, vh){ 
   const kv = kvCaches[layerIdx];
   for(let h=0;h<dims.nHeads;h++){ 
