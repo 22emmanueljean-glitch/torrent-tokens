@@ -1,16 +1,16 @@
 {
   "tensors": {
-    "qkv": "https://torrent-tokens.onrender.com/assets/weights/layer8_qkv.bin",
-    "qkv_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_qkv_b.bin",
-    "o": "https://torrent-tokens.onrender.com/assets/weights/layer8_o.bin",
-    "o_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_o_b.bin",
-    "ff1": "https://torrent-tokens.onrender.com/assets/weights/layer8_ff1.bin",
-    "ff1_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_ff1_b.bin",
-    "ff2": "https://torrent-tokens.onrender.com/assets/weights/layer8_ff2.bin",
-    "ff2_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_ff2_b.bin",
-    "ln1_g": "https://torrent-tokens.onrender.com/assets/weights/layer8_ln1_g.bin",
-    "ln1_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_ln1_b.bin",
-    "ln2_g": "https://torrent-tokens.onrender.com/assets/weights/layer8_ln2_g.bin",
-    "ln2_b": "https://torrent-tokens.onrender.com/assets/weights/layer8_ln2_b.bin"
+    "qkv": "https://torrent-tokens.onrender.com/weights/layer8_qkv.bin",
+    "qkv_b": "https://torrent-tokens.onrender.com/weights/layer8_qkv_b.bin",
+    "o": "https://torrent-tokens.onrender.com/weights/layer8_o.bin",
+    "o_b": "https://torrent-tokens.onrender.com/weights/layer8_o_b.bin",
+    "ff1": "https://torrent-tokens.onrender.com/weights/layer8_ff1.bin",
+    "ff1_b": "https://torrent-tokens.onrender.com/weights/layer8_ff1_b.bin",
+    "ff2": "https://torrent-tokens.onrender.com/weights/layer8_ff2.bin",
+    "ff2_b": "https://torrent-tokens.onrender.com/weights/layer8_ff2_b.bin",
+    "ln1_g": "https://torrent-tokens.onrender.com/weights/layer8_ln1_g.bin",
+    "ln1_b": "https://torrent-tokens.onrender.com/weights/layer8_ln1_b.bin",
+    "ln2_g": "https://torrent-tokens.onrender.com/weights/layer8_ln2_g.bin",
+    "ln2_b": "https://torrent-tokens.onrender.com/weights/layer8_ln2_b.bin"
   }
 }

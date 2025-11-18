@@ -9,10 +9,10 @@
     "maxSeq": 1024
   },
   "tensors": {
-    "wte": "https://torrent-tokens.onrender.com/assets/weights/wte.bin",
-    "wpe": "https://torrent-tokens.onrender.com/assets/weights/wpe.bin",
-    "ln_f_g": "https://torrent-tokens.onrender.com/assets/weights/ln_f_g.bin",
-    "ln_f_b": "https://torrent-tokens.onrender.com/assets/weights/ln_f_b.bin"
+    "wte": "https://torrent-tokens.onrender.com/weights/wte.bin",
+    "wpe": "https://torrent-tokens.onrender.com/weights/wpe.bin",
+    "ln_f_g": "https://torrent-tokens.onrender.com/weights/ln_f_g.bin",
+    "ln_f_b": "https://torrent-tokens.onrender.com/weights/ln_f_b.bin"
   },
   "tokenizer": {
     "vocab": "./assets/tokenizer/vocab.json",
