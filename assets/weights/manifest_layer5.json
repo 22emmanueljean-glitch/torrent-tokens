@@ -1,28 +1,16 @@
 {
-  "modelId": "distilgpt2-layer5",
-  "dtype": "f32",
-  "layout": "row_major",
-  "dims": {
-    "dModel": 768,
-    "nHeads": 12,
-    "dHead": 64,
-    "mlpHidden": 3072,
-    "nLayers": 1,
-    "vocab": 50257,
-    "maxSeq": 1024
-  },
   "tensors": {
-    "qkv": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_qkv.bin",
-    "qkv_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_qkv_b.bin",
-    "o": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_o.bin",
-    "o_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_o_b.bin",
-    "ff1": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ff1.bin",
-    "ff1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ff1_b.bin",
-    "ff2": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ff2.bin",
-    "ff2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ff2_b.bin",
-    "ln1_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ln1_g.bin",
-    "ln1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ln1_b.bin",
-    "ln2_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ln2_g.bin",
-    "ln2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer5_ln2_b.bin"
+    "qkv": "https://torrent-tokens.onrender.com/assets/weights/layer5_qkv.bin",
+    "qkv_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_qkv_b.bin",
+    "o": "https://torrent-tokens.onrender.com/assets/weights/layer5_o.bin",
+    "o_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_o_b.bin",
+    "ff1": "https://torrent-tokens.onrender.com/assets/weights/layer5_ff1.bin",
+    "ff1_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_ff1_b.bin",
+    "ff2": "https://torrent-tokens.onrender.com/assets/weights/layer5_ff2.bin",
+    "ff2_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_ff2_b.bin",
+    "ln1_g": "https://torrent-tokens.onrender.com/assets/weights/layer5_ln1_g.bin",
+    "ln1_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_ln1_b.bin",
+    "ln2_g": "https://torrent-tokens.onrender.com/assets/weights/layer5_ln2_g.bin",
+    "ln2_b": "https://torrent-tokens.onrender.com/assets/weights/layer5_ln2_b.bin"
   }
 }

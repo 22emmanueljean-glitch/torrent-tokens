@@ -13,7 +13,7 @@ function log(s){ addLog(s); }
 
 let dims=null;
 let W=[]; // Array of 6 layers
-let kvCaches = Array(6).fill(null); // Separate KV cache per layer
+let kvCaches = Array(12).fill(null); // Separate KV cache per layer
 let kvLen = 0; // Shared sequence length
 
 async function fetchMaybe(url){ try{ const r=await fetch(url,{cache:"force-cache"}); if(!r.ok) return null; const b=await r.arrayBuffer(); return new Float32Array(b); }catch{ return null; } }
@@ -167,7 +167,7 @@ async function onChanMessage(e){
   if (msg.type===MSG.PING){ chan?.send(JSON.stringify({type:MSG.PONG})); return; }
 
   if (msg.type===MSG.INIT_MODEL){
-    kvCaches = Array(6).fill(null);
+    kvCaches = Array(12).fill(null);
     kvLen = 0;
     W=[]; 
     return;
@@ -231,7 +231,7 @@ async function onChanMessage(e){
     }
     
     // Ensure ALL layers have KV caches initialized
-    for(let i=0; i<6; i++) ensureKV(i);
+    for(let i=0; i<12; i++) ensureKV(i);
     
     const appendKV = true;
     const h = forward_from_embed(emb, layerW, layerIdx, appendKV);

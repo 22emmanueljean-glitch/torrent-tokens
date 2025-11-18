@@ -1,21 +1,18 @@
 {
-  "modelId": "distilgpt2",
-  "dtype": "f32",
-  "layout": "row_major",
   "dims": {
     "dModel": 768,
     "nHeads": 12,
     "dHead": 64,
     "mlpHidden": 3072,
-    "nLayers": 6,
+    "nLayers": 12,
     "vocab": 50257,
     "maxSeq": 1024
   },
   "tensors": {
-    "wte": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/wte.bin",
-    "wpe": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/wpe.bin",
-    "ln_f_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/ln_f_g.bin",
-    "ln_f_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/ln_f_b.bin"
+    "wte": "https://torrent-tokens.onrender.com/assets/weights/wte.bin",
+    "wpe": "https://torrent-tokens.onrender.com/assets/weights/wpe.bin",
+    "ln_f_g": "https://torrent-tokens.onrender.com/assets/weights/ln_f_g.bin",
+    "ln_f_b": "https://torrent-tokens.onrender.com/assets/weights/ln_f_b.bin"
   },
   "tokenizer": {
     "vocab": "./assets/tokenizer/vocab.json",

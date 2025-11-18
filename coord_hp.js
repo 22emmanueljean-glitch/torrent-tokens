@@ -165,7 +165,7 @@ function onPeerMessage(peerId){
       
       // Check if we've processed all layers
       currentLayer++;
-      if(currentLayer < 6){
+      if(currentLayer < 12){
         // Send to next layer
         sendToLayer(currentLayer);
       } else {
@@ -179,7 +179,7 @@ function onPeerMessage(peerId){
           return;
         }
         
-        log(`🎯 All 6 layers complete, sampling token...`);
+        log(`🎯 All 12 layers complete, sampling token...`);
         // Apply final layer norm
         const normalized = new Float32Array(dims.dModel);
         for(let i=0; i<dims.dModel; i++) normalized[i] = hiddenState[i];
@@ -274,7 +274,7 @@ $("btnLoad")?.addEventListener("click", async ()=>{
   if(readyPeers.length===0){ log("⚠️ No ready peers"); return; }
   
   // Load all 6 layers
-  for(let layerIdx = 0; layerIdx < 6; layerIdx++){
+  for(let layerIdx = 0; layerIdx < 12; layerIdx++){
     log(`📥 Loading layer ${layerIdx}...`);
     const man = await (await fetch(`./assets/weights/manifest_layer${layerIdx}.json`,{cache:"no-store"})).json();
     const total=dims.nHeads, per=Math.ceil(total/readyPeers.length);
@@ -288,11 +288,11 @@ $("btnLoad")?.addEventListener("click", async ()=>{
     }
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  log("✅ All 6 layers loaded!");
+  log("✅ All 12 layers loaded!");
 });
 
 $("btnDecode")?.addEventListener("click", ()=>{
-  log("✅ CLICK: Start Decode (6 layers)");
+  log("✅ CLICK: Start Decode (12 layers)");
   maxTokens = parseInt($("maxtok")?.value||"64",10)||64;
   temp = parseFloat($("temp")?.value||"1.0")||1.0;
   topP = parseFloat($("topp")?.value||"0.9")||0.9;
