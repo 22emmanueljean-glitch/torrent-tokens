@@ -45,8 +45,8 @@ function kv_append(layerIdx, kh, vh){
 }
 function self_attn(layerIdx, q, H, dh){ 
   const kv = kvCaches[layerIdx];
-  const T = kvLen; // Use only already-stored tokens
-if(T === 0) return new Float32Array(H*dh); // First token has no context
+  const T = kvLen; // Now includes current token since we appended before calling this
+if(T === 0) return new Float32Array(H*dh); // Should never happen now
   
   const scale=1/Math.sqrt(dh); 
   const ctx=new Float32Array(H*dh); 
@@ -92,9 +92,9 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     kH[h]=s.k.subarray(h*dh,(h+1)*dh);
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
-  ensureKV(layerIdx); // This MUST happen before self_attn!
-  if(appendKV) kv_append(layerIdx, kH, vH);
-  const ctx=self_attn(layerIdx, s.q, H, dh);
+  ensureKV(layerIdx);
+  if(appendKV) kv_append(layerIdx, kH, vH); // Append FIRST
+  const ctx=self_attn(layerIdx, s.q, H, dh); // Then attend (now kvLen is correct)
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
   add_inplace(aOut,layerWeights.o_b);
