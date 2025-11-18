@@ -1,16 +1,16 @@
 {
   "tensors": {
-    "qkv": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_qkv.bin",
-    "qkv_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_qkv_b.bin",
-    "o": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_o.bin",
-    "o_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_o_b.bin",
-    "ff1": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ff1.bin",
-    "ff1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ff1_b.bin",
-    "ff2": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ff2.bin",
-    "ff2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ff2_b.bin",
-    "ln1_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ln1_g.bin",
-    "ln1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ln1_b.bin",
-    "ln2_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ln2_g.bin",
-    "ln2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/layer0_ln2_b.bin"
+    "qkv": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_qkv.bin",
+    "qkv_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_qkv_b.bin",
+    "o": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_o.bin",
+    "o_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_o_b.bin",
+    "ff1": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ff1.bin",
+    "ff1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ff1_b.bin",
+    "ff2": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ff2.bin",
+    "ff2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ff2_b.bin",
+    "ln1_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ln1_g.bin",
+    "ln1_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ln1_b.bin",
+    "ln2_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ln2_g.bin",
+    "ln2_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/layer0_ln2_b.bin"
   }
 }

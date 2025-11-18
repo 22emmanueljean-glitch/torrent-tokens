@@ -9,10 +9,10 @@
     "maxSeq": 1024
   },
   "tensors": {
-    "wte": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/wte.bin",
-    "wpe": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/wpe.bin",
-    "ln_f_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/ln_f_g.bin",
-    "ln_f_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/weights/ln_f_b.bin"
+    "wte": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/wte.bin",
+    "wpe": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/wpe.bin",
+    "ln_f_g": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/ln_f_g.bin",
+    "ln_f_b": "https://pub-bf0385368be044e3b557e08813923f95.r2.dev/assets/weights/ln_f_b.bin"
   },
   "tokenizer": {
     "vocab": "./assets/tokenizer/vocab.json",
