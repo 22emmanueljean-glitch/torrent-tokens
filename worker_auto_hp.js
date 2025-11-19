@@ -38,9 +38,10 @@ function ensureKV(layerIdx){
 
 function kv_append(layerIdx, kh, vh){ 
   const kv = kvCaches[layerIdx];
+  const pos = kvLen - 1; // Use kvLen-1 since we already incremented!
   for(let h=0;h<dims.nHeads;h++){ 
-    kv.K[h][kvLen]=kh[h]; 
-    kv.V[h][kvLen]=vh[h]; 
+    kv.K[h][pos]=kh[h]; 
+    kv.V[h][pos]=vh[h]; 
   } 
 }
 function self_attn(layerIdx, q, H, dh){ 
