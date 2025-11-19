@@ -22,11 +22,12 @@ function ones(n){ const a=new Float32Array(n); a.fill(1); return a; }
 function gelu(x){ const c=Math.sqrt(2/Math.PI); return 0.5*x*(1+Math.tanh(c*(x+0.044715*x*x*x))); }
 function layernorm_inplace(x,g,b){ const d=g.length; let mu=0; for(let i=0;i<d;i++) mu+=x[i]; mu/=d; let vs=0; for(let i=0;i<d;i++){ const t=x[i]-mu; vs+=t*t; } const inv=1/Math.sqrt(vs/d+1e-5); for(let i=0;i<d;i++) x[i]=(x[i]-mu)*inv*g[i]+b[i]; }
 function gemv_right_rowmajor(x,M,rows,cols,out){ 
-  for(let c=0;c<cols;c++){ 
+  // M is transposed: stored as (cols, rows) but we treat it as (rows, cols)
+  for(let r=0;r<rows;r++){ 
     let acc=0; 
-    for(let r=0;r<rows;r++) 
-      acc+=x[r]*M[r*cols+c]; 
-    out[c]=acc; 
+    for(let c=0;c<cols;c++) 
+      acc+=x[c]*M[c*rows+r];  // Changed indexing!
+    out[r]=acc; 
   } 
 }
 function add_inplace(y,b){ for(let i=0;i<y.length;i++) y[i]+=b[i]; }
@@ -101,7 +102,7 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
   const x1=x.slice();
   layernorm_inplace(x1,layerWeights.ln1_g,layerWeights.ln1_b);
   const qkv=new Float32Array(3*D);
-  gemv_right_rowmajor(x1,layerWeights.qkv,3*D,D,qkv);
+  gemv_right_rowmajor(x1,layerWeights.qkv,D,3*D,qkv);
   add_inplace(qkv,layerWeights.qkv_b);
   const s=split_qkv(qkv,D);
   const qH=new Array(H),kH=new Array(H),vH=new Array(H);
@@ -123,7 +124,7 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
   const x2=aOut.slice();
   layernorm_inplace(x2,layerWeights.ln2_g,layerWeights.ln2_b);
   const ff=new Float32Array(dims.mlpHidden);
-  gemv_right_rowmajor(x2,layerWeights.ff1,dims.mlpHidden,D,ff);
+  gemv_right_rowmajor(x2,layerWeights.ff1,D,dims.mlpHidden,ff);
   add_inplace(ff,layerWeights.ff1_b);
   for(let i=0;i<ff.length;i++) ff[i]=gelu(ff[i]);
   const mOut=new Float32Array(D);
