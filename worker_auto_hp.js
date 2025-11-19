@@ -38,7 +38,7 @@ function ensureKV(layerIdx){
 
 function kv_append(layerIdx, kh, vh){ 
   const kv = kvCaches[layerIdx];
-  const pos = kvLen - 1; // Use kvLen-1 since we already incremented!
+  const pos = kvLen; // Use kvLen directly!
   for(let h=0;h<dims.nHeads;h++){ 
     kv.K[h][pos]=kh[h]; 
     kv.V[h][pos]=vh[h]; 
@@ -94,8 +94,10 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV(layerIdx);
-  if(appendKV && layerIdx === 0) kvLen++; // Increment BEFORE append on first layer
-  if(appendKV) kv_append(layerIdx, kH, vH); 
+  if(appendKV) {
+    kv_append(layerIdx, kH, vH);
+    if(layerIdx === 11) kvLen++; // Increment AFTER last layer appends
+  }
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
