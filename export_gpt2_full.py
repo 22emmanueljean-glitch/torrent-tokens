@@ -34,18 +34,15 @@ for i in range(12):
     print(f"\n📥 Exporting layer {i}/12...")
     layer = model.transformer.h[i]
     
-    # QKV weights (768 × 2304)
-    qkv_weight = layer.attn.c_attn.weight.detach().cpu().numpy().astype(np.float32)
+    qkv_weight = layer.attn.c_attn.weight.detach().cpu().numpy().astype(np.float32).T  # ADD .T
     qkv_bias = layer.attn.c_attn.bias.detach().cpu().numpy().astype(np.float32)
     
-    # Output projection (768 × 768)
-    o_weight = layer.attn.c_proj.weight.detach().cpu().numpy().astype(np.float32)
+    o_weight = layer.attn.c_proj.weight.detach().cpu().numpy().astype(np.float32).T  # ADD .T
     o_bias = layer.attn.c_proj.bias.detach().cpu().numpy().astype(np.float32)
     
-    # FFN (768 → 3072 → 768)
-    ff1_weight = layer.mlp.c_fc.weight.detach().cpu().numpy().astype(np.float32)
+    ff1_weight = layer.mlp.c_fc.weight.detach().cpu().numpy().astype(np.float32).T  # ADD .T
     ff1_bias = layer.mlp.c_fc.bias.detach().cpu().numpy().astype(np.float32)
-    ff2_weight = layer.mlp.c_proj.weight.detach().cpu().numpy().astype(np.float32)
+    ff2_weight = layer.mlp.c_proj.weight.detach().cpu().numpy().astype(np.float32).T  # ADD .T
     ff2_bias = layer.mlp.c_proj.bias.detach().cpu().numpy().astype(np.float32)
     
     # Layer norms
