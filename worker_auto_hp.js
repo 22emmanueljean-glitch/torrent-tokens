@@ -48,6 +48,12 @@ function self_attn(layerIdx, q, H, dh){
   const kv = kvCaches[layerIdx];
   const T = kvLen; // Now includes current token since we appended before calling this
 if(T === 0) return new Float32Array(H*dh); // Should never happen now
+// ADD LOGGING HERE
+if(layerIdx === 0 && T === 1) {
+  log(`🔍 DEBUG Layer 0, T=1:`);
+  log(`  q[0..5]: ${Array.from(q.slice(0,5)).map(x=>x.toFixed(4)).join(',')}`);
+  log(`  K[0][0][0..5]: ${Array.from(kv.K[0][0].slice(0,5)).map(x=>x.toFixed(4)).join(',')}`);
+}
   
   const scale=1/Math.sqrt(dh); 
   const ctx=new Float32Array(H*dh); 
@@ -59,6 +65,10 @@ if(T === 0) return new Float32Array(H*dh); // Should never happen now
       const Kt=kv.K[h][t]; 
       for(let j=0;j<dh;j++) dot+=qh[j]*Kt[j]; 
       scores[t]=dot*scale; 
+      // LOG ATTENTION SCORES
+    if(layerIdx === 0 && T === 1 && h === 0) {
+      log(`  scores[0]: ${scores[0].toFixed(4)}`);
+    }
     } 
     let m=-1e30; 
     for(let i=0;i<scores.length;i++) if(scores[i]>m) m=scores[i]; 
