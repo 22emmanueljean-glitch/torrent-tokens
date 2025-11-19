@@ -93,8 +93,9 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
     vH[h]=s.v.subarray(h*dh,(h+1)*dh);
   }
   ensureKV(layerIdx);
-  if(appendKV) kv_append(layerIdx, kH, vH); // Append FIRST
-  const ctx=self_attn(layerIdx, s.q, H, dh); // Then attend (now kvLen is correct)
+  if(appendKV && layerIdx === 0) kvLen++; // Increment BEFORE append on first layer
+  if(appendKV) kv_append(layerIdx, kH, vH); 
+  const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
   add_inplace(aOut,layerWeights.o_b);
@@ -235,7 +236,6 @@ async function onChanMessage(e){
     
     const appendKV = true;
     const h = forward_from_embed(emb, layerW, layerIdx, appendKV);
-    if(layerIdx === 11) kvLen++; // Increment after last layer // Increment after layer 0 completes
     
     chan?.send(JSON.stringify({ type: MSG.STATE_OUT, stepId: msg.stepId, hidden: Array.from(h) }));
     return;
