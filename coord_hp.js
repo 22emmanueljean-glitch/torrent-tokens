@@ -343,6 +343,6 @@ function sendStep(){
   
   const payload=Array.from(hiddenState);
   for(const [pid,p] of readyPeers){ 
-    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, layer:0, embed:payload, isFirst:true })); }catch{}
+    try{ p.dc.send(JSON.stringify({ type:MSG.DECODE_STEP, stepId:step, pos, layer:0, embed:payload, isFirst:(step===0) })); }catch{}
   }
 }
