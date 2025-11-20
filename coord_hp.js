@@ -263,6 +263,8 @@ $("btnInit")?.addEventListener("click", async ()=>{
   log("✅ CLICK: Init Model");
   const promptText = $("prompt")?.value || "";
   promptTokens = tokenizer ? tokenizer.encode(promptText) : [];
+  console.log("🔍 DEBUG: promptText =", promptText);
+  console.log("🔍 DEBUG: promptTokens =", promptTokens);
   lastToken=null;
   log(`Prompt: ${promptTokens.length} tokens`);
   for (const [_, p] of peers.entries()){ if(p.ready){ p.dc.send(JSON.stringify({ type:MSG.INIT_MODEL, proto:PROTO, build:BUILD })); } }
