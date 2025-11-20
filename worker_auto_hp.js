@@ -177,7 +177,7 @@ joinBtn.onclick = async () => {
   connectWS();
 };
 reconnectBtn.onclick = () => { log("↻ Reconnect requested"); try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} setTimeout(connectWS,200); };
-hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; kvCaches=Array(6).fill(null); kvLen=0; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
+hardResetBtn.onclick = () => { log("🧹 Hard reset"); peerId=null; W=[]; kvCaches=Array(12).fill(null); kvLen=0; try{ chan?.close(); }catch{} try{ pc?.close(); }catch{} try{ ws?.close(); }catch{} };
 nukeBtn.onclick = async () => { log("💥 Nuke Cache requested"); try{ if("serviceWorker" in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs){ try{ await r.unregister(); }catch{} } } if("caches" in window){ const keys=await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); } location.reload(); }catch{} };
 
 async function onChanMessage(e){
