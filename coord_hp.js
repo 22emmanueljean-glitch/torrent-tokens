@@ -188,6 +188,26 @@ function onPeerMessage(peerId){
         const inv=1/Math.sqrt(vs+1e-5);
         for(let i=0;i<dims.dModel;i++) normalized[i]=(normalized[i]-mu)*inv*LN_F_G[i]+LN_F_B[i];
         const logits=logits_from_hidden(normalized);
+        // === DIAGNOSTIC CODE START ===
+console.log("🔍 DIAGNOSTIC: Top-5 logits BEFORE sampling");
+const logitsCopy = logits.slice();
+for(let i = 0; i < 5; i++) {
+  let maxIdx = 0;
+  let maxVal = -Infinity;
+  for(let j = 0; j < logitsCopy.length; j++) {
+    if(logitsCopy[j] > maxVal) {
+      maxVal = logitsCopy[j];
+      maxIdx = j;
+    }
+  }
+  console.log(`  tok=${maxIdx.toString().padStart(5)} logit=${maxVal.toFixed(3).padStart(8)}`);
+  logitsCopy[maxIdx] = -Infinity;
+}
+console.log(`🔍 SAMPLER TEMP = ${temp}`);
+console.log(`🔍 logits[50256] (EOS) = ${logits[50256].toFixed(3)}`);
+console.log(`🔍 logits[464] (The) = ${logits[464].toFixed(3)}`);
+console.log(`🔍 logits[318] (is) = ${logits[318].toFixed(3)}`);
+// === DIAGNOSTIC CODE END ===
         softmax_inplace(logits, temp);
         const nextId=top_p_sample(logits, topP);
         log(`🎯 Sampled ID: ${nextId} (vocab size: ${logits.length})`);
