@@ -233,6 +233,10 @@ async function onChanMessage(e){
 
   if (msg.type===MSG.DECODE_STEP){
     const layerIdx = typeof msg.layer === 'number' ? msg.layer : 0;
+    // RESET kvLen at the start of a new sequence
+    if (msg.isFirst) {
+        kvLen = 0;
+    }
     
     if(!dims || !W[layerIdx]) {
       log("❌ Layer " + layerIdx + " not loaded!");
