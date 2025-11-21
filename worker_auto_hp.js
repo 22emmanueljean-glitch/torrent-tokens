@@ -113,8 +113,8 @@ function forward_from_embed(x, layerWeights, layerIdx, appendKV){
   ensureKV(layerIdx);
   if(appendKV) {
     kv_append(layerIdx, kH, vH);
-    kvLen++; // Increment IMMEDIATELY after appending to THIS layer's cache!
 }
+if(layerIdx === 11) kvLen++; 
   const ctx=self_attn(layerIdx, s.q, H, dh);
   const aOut=new Float32Array(D);
   gemv_right_rowmajor(ctx,layerWeights.o,D,D,aOut);
