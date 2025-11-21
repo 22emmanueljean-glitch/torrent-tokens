@@ -56,7 +56,7 @@ function self_attn(layerIdx, q, H, dh){
   const T = kvLen; // Now includes current token since we appended before calling this
 if(T === 0) return new Float32Array(H*dh); // Should never happen now
 // ADD LOGGING HERE
-if(layerIdx === 0 && T === 1) {
+if(layerIdx === 0 && T >= 1 && T <= 5) {
   log("🔍 DEBUG Layer 0, T=1:");
   log("  q: " + Array.from(q.slice(0,5)).map(x=>x.toFixed(4)).join(','));
   log("  K: " + Array.from(kv.K[0][0].slice(0,5)).map(x=>x.toFixed(4)).join(','));
